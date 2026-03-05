@@ -1,0 +1,47 @@
+[build]
+  command   = "npm run build"
+  publish   = "dist"
+
+[functions]
+  directory      = "netlify/functions"
+  node_bundler   = "esbuild"
+
+# ── Scheduled Function désactivée (plan gratuit) ──
+# Décommenter + upgrader vers Pro pour activer le cron automatique :
+# [functions."poll-emails"]
+#   schedule = "*/20 * * * *"
+
+# ── Redirections API → Netlify Functions ──
+[[redirects]]
+  from   = "/api/emails"
+  to     = "/.netlify/functions/get-emails"
+  status = 200
+
+[[redirects]]
+  from   = "/api/emails/*"
+  to     = "/.netlify/functions/email-action"
+  status = 200
+
+[[redirects]]
+  from   = "/api/guide"
+  to     = "/.netlify/functions/upload-guide"
+  status = 200
+
+[[redirects]]
+  from   = "/api/examples"
+  to     = "/.netlify/functions/manage-examples"
+  status = 200
+
+[[redirects]]
+  from   = "/api/rules"
+  to     = "/.netlify/functions/manage-rules"
+  status = 200
+
+# ── SPA fallback (React Router) ──
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+[build.environment]
+  NODE_VERSION = "20"
