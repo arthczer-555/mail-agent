@@ -11,7 +11,8 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "./dist-functions",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "paths": {}
   },
   "include": ["src", "netlify/functions"],
