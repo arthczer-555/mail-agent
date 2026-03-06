@@ -21,7 +21,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
 
   const conf        = CLASSIFICATION_CONFIG[email.classification] ?? CLASSIFICATION_CONFIG['NORMAL']
   const body        = email.body_text || email.body_preview || '(corps vide)'
-  const attachments = email.attachments ?? []
+  const attachments = Array.isArray(email.attachments) ? email.attachments : []
   const gmailUrl    = `https://mail.google.com/mail/u/0/#inbox/${email.gmail_id}`
 
   const sendAction = async (action: 'validate' | 'reject') => {
