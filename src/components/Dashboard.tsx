@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Email, Classification, Stats, CLASSIFICATION_CONFIG } from '../types'
 import EmailCard from './EmailCard'
 import EmailDetail from './EmailDetail'
@@ -170,10 +171,10 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* ── Modal email ── */}
-      {selectedEmail && (
+      {/* ── Modal email (Portal sur document.body pour éviter tout problème CSS) ── */}
+      {selectedEmail && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           onClick={e => { if (e.target === e.currentTarget) handleClose() }}
         >
           <div className="w-full max-w-5xl max-h-[90vh] flex flex-col rounded-xl overflow-hidden shadow-2xl">
@@ -183,7 +184,8 @@ export default function Dashboard() {
               onAction={handleAction}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Barre du bas ── */}
