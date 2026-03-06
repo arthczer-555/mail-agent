@@ -4,7 +4,7 @@
 // ============================================================
 // import type { Config } from '@netlify/functions'; // à réactiver avec le cron
 import { getDb, corsHeaders, jsonResponse } from './_db.js';
-import { getGmailClient, extractBody, extractAttachments, getHeader } from './_gmail.js';
+import { getGmailClient, extractBody, extractAttachments, getHeader, buildRawEmail } from './_gmail.js';
 import { classifyAndDraftEmail } from './_claude.js';
 
 export default async function handler(req: Request) {

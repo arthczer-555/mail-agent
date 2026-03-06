@@ -158,21 +158,21 @@ export default function Dashboard() {
 
           return (
             <div key={classification} className="flex-1 flex flex-col min-w-0">
-              <div className={`flex items-center justify-between px-3 py-2 rounded-lg mb-3 ${conf.bg} ${conf.border} border`}>
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl mb-3 bg-white border border-gray-100 shadow-sm">
                 <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${
+                  <span className={`w-2 h-2 rounded-full ${
                     classification === 'URGENT'    ? 'bg-red-500' :
-                    classification === 'IMPORTANT' ? 'bg-orange-500' :
-                    classification === 'NORMAL'    ? 'bg-yellow-500' :
-                    'bg-green-500'
+                    classification === 'IMPORTANT' ? 'bg-orange-400' :
+                    classification === 'NORMAL'    ? 'bg-blue-400' :
+                    'bg-gray-400'
                   }`} />
-                  <span className={`font-semibold text-sm ${conf.color}`}>{conf.label}</span>
+                  <span className="font-semibold text-sm text-gray-800">{conf.label}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${conf.badge}`}>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${conf.badge}`}>
                     {countForColumn(classification)}
                   </span>
-                  <span className="text-xs text-gray-400">/ {totalForColumn(classification)}</span>
+                  <span className="text-xs text-gray-300">/ {totalForColumn(classification)}</span>
                 </div>
               </div>
 
@@ -202,7 +202,7 @@ export default function Dashboard() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           onClick={e => { if (e.target === e.currentTarget) handleClose() }}
         >
-          <div className="w-full max-w-5xl max-h-[90vh] flex flex-col rounded-xl overflow-hidden shadow-2xl">
+          <div className="w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl">
             <ModalErrorBoundary onClose={handleClose}>
               <EmailDetail
                 email={selectedEmail}
@@ -224,10 +224,10 @@ export default function Dashboard() {
             Traitement {pollProgress.done} / {pollProgress.total}...
           </span>
         ) : pollResult ? (
-          <span className={`px-2.5 py-1 rounded-lg font-medium ${
+          <span className={`px-2.5 py-1 rounded-full font-medium ${
             pollResult.startsWith('Erreur') || pollResult.startsWith('Réseau')
               ? 'bg-red-50 text-red-600'
-              : 'bg-green-50 text-green-700'
+              : 'bg-gray-100 text-gray-700'
           }`}>
             {pollResult}
           </span>
@@ -235,7 +235,7 @@ export default function Dashboard() {
 
         {/* Badge mails non lus */}
         {unreadCount !== null && unreadCount > 0 && (
-          <span className="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">
+          <span className="bg-black text-white font-semibold px-2.5 py-0.5 rounded-full">
             {unreadCount} non lu{unreadCount > 1 ? 's' : ''}
           </span>
         )}
@@ -243,14 +243,14 @@ export default function Dashboard() {
         <button
           onClick={handlePoll}
           disabled={polling}
-          className="hover:text-indigo-600 transition-colors underline underline-offset-2 disabled:opacity-50"
+          className="hover:text-black transition-colors underline underline-offset-2 disabled:opacity-40"
         >
           {polling ? 'Polling...' : 'Lancer le polling'}
         </button>
         <span>·</span>
         <button
           onClick={fetchEmails}
-          className="hover:text-indigo-600 transition-colors underline underline-offset-2"
+          className="hover:text-black transition-colors underline underline-offset-2"
         >
           {refreshed ? 'Actualisé ✓' : 'Actualiser'}
         </button>

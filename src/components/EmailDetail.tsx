@@ -63,14 +63,14 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
     <div className="bg-white flex flex-col" style={{ maxHeight: '90vh' }}>
 
       {/* ── En-tête ── */}
-      <div className={`flex items-center justify-between px-5 py-4 border-b ${conf.border} ${conf.bg} flex-shrink-0`}>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${conf.badge}`}>
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${conf.badge}`}>
             {conf.label}
           </span>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">{email.subject}</p>
-            <p className="text-xs text-gray-500 truncate">
+            <p className="text-xs text-gray-400 truncate">
               {email.from_name && `${email.from_name} · `}{email.from_email} · {formatDate(email.received_at)}
             </p>
           </div>
@@ -80,13 +80,13 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
             href={gmailUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+            className="text-xs text-gray-400 hover:text-black underline underline-offset-2 transition-colors"
           >
             Ouvrir dans Gmail
           </a>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-white/60 rounded-lg transition-colors text-gray-400 hover:text-gray-700"
+            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-700"
             title="Fermer"
           >
             ✕
@@ -116,7 +116,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
               </h3>
               <div className="flex flex-col gap-1.5">
                 {attachments.map((att, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  <div key={i} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
                     <span className="text-base">📎</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-800 truncate">{att.filename}</p>
@@ -126,7 +126,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
                       href={gmailUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-indigo-500 hover:text-indigo-700 flex-shrink-0"
+                      className="text-xs text-gray-400 hover:text-black flex-shrink-0 transition-colors"
                     >
                       Voir dans Gmail
                     </a>
@@ -138,9 +138,9 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
 
           {/* Analyse Claude */}
           {email.reasoning && (
-            <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-100">
-              <p className="text-xs font-semibold text-indigo-700 mb-1">Analyse de l'agent</p>
-              <p className="text-xs text-indigo-600 leading-relaxed">{email.reasoning}</p>
+            <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 mb-1">Analyse de l'agent</p>
+              <p className="text-xs text-gray-500 leading-relaxed">{email.reasoning}</p>
             </div>
           )}
         </div>
@@ -153,7 +153,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
             </h3>
             <button
               onClick={() => setMode(mode === 'view' ? 'edit' : 'view')}
-              className="text-xs text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+              className="text-xs text-gray-400 hover:text-black underline underline-offset-2 transition-colors"
             >
               {mode === 'view' ? '✏️ Modifier' : '👁 Prévisualiser'}
             </button>
@@ -167,7 +167,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
             <textarea
               value={response}
               onChange={e => setResponse(e.target.value)}
-              className="flex-1 text-sm text-gray-700 leading-relaxed border border-gray-200 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[200px]"
+              className="flex-1 text-sm text-gray-700 leading-relaxed border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-black min-h-[200px]"
               placeholder="Réponse..."
             />
           )}
@@ -175,7 +175,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
       </div>
 
       {/* ── Barre d'actions ── */}
-      <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
+      <div className="px-5 py-3 bg-white border-t border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
         <p className="text-xs text-gray-400">
           {['NORMAL', 'FAIBLE'].includes(email.classification)
             ? '→ "Brouillon Gmail" pour réviser dans Gmail · "Envoyer" pour envoyer directement'
@@ -185,7 +185,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
 
         <div className="flex items-center gap-2">
           {feedback ? (
-            <span className="text-sm font-medium text-green-700 bg-green-50 px-3 py-1.5 rounded-lg">
+            <span className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full">
               {feedback}
             </span>
           ) : (

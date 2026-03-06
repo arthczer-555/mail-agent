@@ -10,32 +10,31 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
         <div className="px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Logo texte */}
-            <span className="text-xl font-bold text-indigo-700 tracking-tight">Coachello</span>
-            <span className="text-gray-300">|</span>
-            <span className="text-sm text-gray-500 font-medium">Agent Email</span>
+            <span className="text-lg font-bold text-black tracking-tight">Coachello</span>
+            <span className="text-gray-200">|</span>
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-widest">Agent Email</span>
           </div>
 
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-1 bg-gray-100 rounded-full p-1">
             <button
               onClick={() => setView('dashboard')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 view === 'dashboard'
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'text-gray-500 hover:text-gray-800'
               }`}
             >
               Dashboard
             </button>
             <button
               onClick={() => setView('admin')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 view === 'admin'
-                  ? 'bg-indigo-50 text-indigo-700'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'text-gray-500 hover:text-gray-800'
               }`}
             >
               Administration
