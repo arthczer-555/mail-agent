@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 @layer base {
-  html, body, #root {
+  html, body {
     @apply overflow-x-hidden;
   }
   body {

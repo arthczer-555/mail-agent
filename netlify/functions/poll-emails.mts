@@ -48,7 +48,7 @@ export default async function handler(req: Request) {
     const listRes = await gmail.users.messages.list({
       userId: 'me',
       q: 'is:unread -from:me newer_than:3d',
-      maxResults: 1,
+      maxResults: 10, // plusieurs pour trouver le prochain non traité
     });
 
     const messages = listRes.data.messages ?? [];
@@ -149,6 +149,7 @@ export default async function handler(req: Request) {
 
         processed++;
         console.log(`[poll-emails] ✓ ${fromEmail} — ${subject} → ${result.classification}`);
+        break; // 1 email traité par appel (anti-timeout), le suivant sera pris au prochain appel
 
       } catch (err) {
         console.error(`[poll-emails] ✗ Erreur sur email ${gmailId}:`, err);
