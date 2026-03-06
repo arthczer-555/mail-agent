@@ -93,8 +93,14 @@ export default async function handler(req: Request) {
         const { text: bodyText, html: bodyHtml } = extractBody(payload);
         const attachments = extractAttachments(payload);
 
-        // Ignorer les emails trop courts (accusés de réception, etc.)
-        if (bodyText.trim().length < 10) {
+        // Si pas de texte brut, extraire le texte depuis l'HTML (emails HTML-only)
+        let effectiveBody = bodyText.trim();
+        if (effectiveBody.length < 10 && bodyHtml) {
+          effectiveBody = bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        // Ignorer les emails vraiment vides (accusés de réception, tracking pixels, etc.)
+        if (effectiveBody.length < 5 && subject === '(sans objet)') {
           skipped++;
           continue;
         }
@@ -107,7 +113,7 @@ export default async function handler(req: Request) {
           fromEmail,
           fromName,
           subject,
-          body: bodyText.slice(0, 3000), // Limiter à 3000 chars pour économiser les tokens
+          body: effectiveBody.slice(0, 3000),
         });
 
         // ── 6. Stocker en base (avec fallback si colonne attachments absente) ──
