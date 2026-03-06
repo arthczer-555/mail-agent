@@ -1,8 +1,30 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Component } from 'react'
 import { createPortal } from 'react-dom'
 import { Email, Classification, Stats, CLASSIFICATION_CONFIG } from '../types'
 import EmailCard from './EmailCard'
 import EmailDetail from './EmailDetail'
+
+class ModalErrorBoundary extends Component<
+  { onClose: () => void; children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null }
+  static getDerivedStateFromError(error: Error) { return { error } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="bg-white rounded-xl p-8 max-w-lg mx-auto shadow-2xl">
+          <p className="text-red-600 font-semibold mb-2">Erreur d'affichage</p>
+          <pre className="text-xs text-gray-600 bg-gray-50 p-3 rounded overflow-auto mb-4">
+            {(this.state.error as Error).message}
+          </pre>
+          <button onClick={this.props.onClose} className="btn-ghost text-sm">Fermer</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const COLUMNS: Classification[] = ['URGENT', 'IMPORTANT', 'NORMAL', 'FAIBLE']
 
@@ -178,11 +200,13 @@ export default function Dashboard() {
           onClick={e => { if (e.target === e.currentTarget) handleClose() }}
         >
           <div className="w-full max-w-5xl max-h-[90vh] flex flex-col rounded-xl overflow-hidden shadow-2xl">
-            <EmailDetail
-              email={selectedEmail}
-              onClose={handleClose}
-              onAction={handleAction}
-            />
+            <ModalErrorBoundary onClose={handleClose}>
+              <EmailDetail
+                email={selectedEmail}
+                onClose={handleClose}
+                onAction={handleAction}
+              />
+            </ModalErrorBoundary>
           </div>
         </div>,
         document.body

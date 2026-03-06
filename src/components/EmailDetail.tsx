@@ -19,7 +19,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
   const [mode, setMode]         = useState<'view' | 'edit'>('view')
   const [feedback, setFeedback] = useState<string | null>(null)
 
-  const conf        = CLASSIFICATION_CONFIG[email.classification]
+  const conf        = CLASSIFICATION_CONFIG[email.classification] ?? CLASSIFICATION_CONFIG['NORMAL']
   const body        = email.body_text || email.body_preview || '(corps vide)'
   const attachments = email.attachments ?? []
   const gmailUrl    = `https://mail.google.com/mail/u/0/#inbox/${email.gmail_id}`
