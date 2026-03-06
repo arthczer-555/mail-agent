@@ -34,26 +34,15 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [fetchEmails])
 
-  // Ouvrir un email : tenter de verrouiller, puis afficher le modal
-  const handleOpen = async (email: Email) => {
-    try {
-      const res = await fetch(`/api/emails/${email.id}/lock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user: 'team' }),
-      })
-      if (res.status === 409) {
-        const data = await res.json().catch(() => ({}))
-        alert(`Cet email est en cours de traitement par ${(data as any).locked_by ?? 'un collègue'}`)
-        return
-      }
-      if (res.ok) {
-        setEmails(prev => prev.map(e => e.id === email.id ? { ...e, status: 'locked' } : e))
-      }
-    } catch {
-      // Lock failed (DB indisponible) — on ouvre quand même en lecture
-    }
+  // Ouvrir le modal immédiatement, locker en arrière-plan
+  const handleOpen = (email: Email) => {
     setSelected(email)
+    setEmails(prev => prev.map(e => e.id === email.id ? { ...e, status: 'locked' } : e))
+    fetch(`/api/emails/${email.id}/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: 'team' }),
+    }).catch(() => {/* silencieux */})
   }
 
   // Fermer le modal : déverrouiller
