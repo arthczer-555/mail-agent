@@ -7,11 +7,26 @@ import { getDb, corsHeaders, jsonResponse } from './_db.js';
 import { getGmailClient, extractBody, extractAttachments, getHeader } from './_gmail.js';
 import { classifyAndDraftEmail } from './_claude.js';
 
-export default async function handler() {
+export default async function handler(req: Request) {
+  const gmail = getGmailClient();
+
+  // ── Mode compteur : retourne juste le nombre de mails non lus ──
+  if (new URL(req.url).searchParams.get('count') === 'true') {
+    try {
+      const listRes = await gmail.users.messages.list({
+        userId: 'me',
+        q: 'is:unread -from:me newer_than:3d',
+        maxResults: 1,
+      });
+      return jsonResponse({ count: listRes.data.resultSizeEstimate ?? 0 });
+    } catch (err) {
+      return jsonResponse({ count: 0 });
+    }
+  }
+
   console.log('[poll-emails] Démarrage du polling Gmail —', new Date().toISOString());
 
-  const db  = getDb();
-  const gmail = getGmailClient();
+  const db = getDb();
 
   try {
     // ── 1. Charger le guide, les exemples et les règles depuis la BDD ──
@@ -33,7 +48,7 @@ export default async function handler() {
     const listRes = await gmail.users.messages.list({
       userId: 'me',
       q: 'is:unread -from:me newer_than:3d',
-      maxResults: 5,
+      maxResults: 1,
     });
 
     const messages = listRes.data.messages ?? [];

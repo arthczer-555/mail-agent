@@ -13,6 +13,8 @@ export default function Dashboard() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [polling, setPolling]         = useState(false)
   const [pollResult, setPollResult]   = useState<string | null>(null)
+  const [pollProgress, setPollProgress] = useState<{ done: number; total: number } | null>(null)
+  const [unreadCount, setUnreadCount] = useState<number | null>(null)
 
   const fetchEmails = useCallback(async () => {
     try {
@@ -28,11 +30,25 @@ export default function Dashboard() {
     }
   }, [])
 
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res  = await fetch('/api/poll?count=true')
+      const data = await res.json()
+      if (data.count !== undefined) setUnreadCount(data.count)
+    } catch {
+      // silencieux
+    }
+  }, [])
+
   useEffect(() => {
     fetchEmails()
-    const interval = setInterval(fetchEmails, 2 * 60 * 1000)
+    fetchUnreadCount()
+    const interval = setInterval(() => {
+      fetchEmails()
+      fetchUnreadCount()
+    }, 2 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [fetchEmails])
+  }, [fetchEmails, fetchUnreadCount])
 
   // Ouvrir le modal immédiatement, locker en arrière-plan
   const handleOpen = (email: Email) => {
@@ -60,28 +76,39 @@ export default function Dashboard() {
   const handlePoll = async () => {
     setPolling(true)
     setPollResult(null)
-    try {
-      const res  = await fetch('/api/poll')
-      const text = await res.text()
-      let data: any
-      try { data = JSON.parse(text) } catch { data = null }
+    setPollProgress(null)
 
-      if (!res.ok) {
-        setPollResult(`Erreur ${res.status} — voir logs Netlify`)
-      } else if (data?.success) {
-        setPollResult(
-          data.processed > 0
-            ? `${data.processed} email(s) traité(s)`
-            : 'Aucun nouveau mail'
-        )
+    let totalProcessed = 0
+    const MAX_ITERATIONS = 20
+
+    for (let i = 0; i < MAX_ITERATIONS; i++) {
+      try {
+        const res  = await fetch('/api/poll')
+        const text = await res.text()
+        let data: any
+        try { data = JSON.parse(text) } catch { data = null }
+
+        if (!res.ok || !data?.success) {
+          setPollResult(`Erreur ${res.status} — voir logs Netlify`)
+          break
+        }
+
+        totalProcessed += data.processed
+        setPollProgress({ done: totalProcessed, total: totalProcessed + (data.total ?? 0) })
+
         if (data.processed > 0) fetchEmails()
-      } else {
-        setPollResult(`Erreur : ${data?.error ?? 'réponse invalide'}`)
+        if (data.processed === 0) break  // plus rien à traiter
+
+      } catch (err) {
+        setPollResult(`Réseau : ${err instanceof Error ? err.message : 'inconnu'}`)
+        break
       }
-    } catch (err) {
-      setPollResult(`Réseau : ${err instanceof Error ? err.message : 'inconnu'}`)
     }
+
+    setPollResult(totalProcessed > 0 ? `${totalProcessed} email(s) traité(s)` : 'Aucun nouveau mail')
     setPolling(false)
+    setPollProgress(null)
+    fetchUnreadCount()
     setTimeout(() => setPollResult(null), 8000)
   }
 
@@ -89,6 +116,7 @@ export default function Dashboard() {
   const handleAction = () => {
     setSelected(null)
     fetchEmails()
+    fetchUnreadCount()
   }
 
   const countForColumn = (classification: Classification) =>
@@ -110,7 +138,7 @@ export default function Dashboard() {
   return (
     <div className="flex gap-4 h-[calc(100vh-8rem)]">
 
-      {/* ── Colonnes du Kanban (toujours visibles) ── */}
+      {/* ── Colonnes du Kanban ── */}
       <div className="flex gap-4 flex-1">
         {COLUMNS.map(classification => {
           const conf         = CLASSIFICATION_CONFIG[classification]
@@ -174,15 +202,29 @@ export default function Dashboard() {
 
       {/* ── Barre du bas ── */}
       <div className="fixed bottom-4 right-6 text-xs text-gray-400 flex items-center gap-3">
-        {pollResult && (
+
+        {/* Résultat / progression */}
+        {polling && pollProgress ? (
+          <span className="text-gray-500 font-medium">
+            Traitement {pollProgress.done} / {pollProgress.total}...
+          </span>
+        ) : pollResult ? (
           <span className={`px-2.5 py-1 rounded-lg font-medium ${
-            pollResult.startsWith('Erreur') || pollResult.startsWith('Impossible')
+            pollResult.startsWith('Erreur') || pollResult.startsWith('Réseau')
               ? 'bg-red-50 text-red-600'
               : 'bg-green-50 text-green-700'
           }`}>
             {pollResult}
           </span>
+        ) : null}
+
+        {/* Badge mails non lus */}
+        {unreadCount !== null && unreadCount > 0 && (
+          <span className="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">
+            {unreadCount} non lu{unreadCount > 1 ? 's' : ''}
+          </span>
         )}
+
         <button
           onClick={handlePoll}
           disabled={polling}
