@@ -14,7 +14,7 @@ function formatSize(bytes: number): string {
 }
 
 export default function EmailDetail({ email, onClose, onAction }: Props) {
-  const [response, setResponse] = useState(email.draft_response)
+  const [response, setResponse] = useState(email.draft_response ?? '')
   const [loading, setLoading]   = useState(false)
   const [mode, setMode]         = useState<'view' | 'edit'>('view')
   const [feedback, setFeedback] = useState<string | null>(null)
