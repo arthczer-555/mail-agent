@@ -34,14 +34,11 @@ export default function Dashboard() {
   const [selectedEmail, setSelected]  = useState<Email | null>(null)
   const [loading, setLoading]         = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
-  const [polling, setPolling]       = useState(false)
-  const [pollResult, setPollResult] = useState<string | null>(null)
-  const [refreshed, setRefreshed]   = useState(false)
-
-  // Nombre d'emails en attente calculé depuis les stats (pas d'appel Gmail)
-  const unreadCount = stats
-    .filter(s => s.status === 'pending' || s.status === 'locked')
-    .reduce((sum, s) => sum + parseInt(s.count), 0)
+  const [polling, setPolling]         = useState(false)
+  const [pollResult, setPollResult]   = useState<string | null>(null)
+  const [refreshed, setRefreshed]     = useState(false)
+  const [pollProgress, setPollProgress] = useState<{ done: number; total: number } | null>(null)
+  const [unreadCount, setUnreadCount] = useState<number | null>(null)
 
   const fetchEmails = useCallback(async () => {
     try {
@@ -59,11 +56,25 @@ export default function Dashboard() {
     }
   }, [])
 
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res  = await fetch('/api/poll?count=true')
+      const data = await res.json()
+      if (data.count !== undefined) setUnreadCount(data.count)
+    } catch {
+      // silencieux
+    }
+  }, [])
+
   useEffect(() => {
     fetchEmails()
-    const interval = setInterval(fetchEmails, 2 * 60 * 1000)
+    fetchUnreadCount()
+    const interval = setInterval(() => {
+      fetchEmails()
+      fetchUnreadCount()
+    }, 2 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [fetchEmails])
+  }, [fetchEmails, fetchUnreadCount])
 
   const handleOpen = (email: Email) => {
     setSelected(email)
@@ -77,21 +88,39 @@ export default function Dashboard() {
   const handlePoll = async () => {
     setPolling(true)
     setPollResult(null)
-    try {
-      const res  = await fetch('/api/manual-poll')
-      const text = await res.text()
-      let data: any
-      try { data = JSON.parse(text) } catch { data = null }
-      if (!res.ok || !data?.success) {
-        setPollResult(`Erreur ${res.status}`)
-      } else {
-        setPollResult(data.processed > 0 ? `${data.processed} email(s) traité(s)` : 'Aucun nouveau mail')
+    setPollProgress(null)
+
+    let totalProcessed = 0
+    const MAX_ITERATIONS = 20
+
+    for (let i = 0; i < MAX_ITERATIONS; i++) {
+      try {
+        const res  = await fetch('/api/poll')
+        const text = await res.text()
+        let data: any
+        try { data = JSON.parse(text) } catch { data = null }
+
+        if (!res.ok || !data?.success) {
+          setPollResult(`Erreur ${res.status} — voir logs Netlify`)
+          break
+        }
+
+        totalProcessed += data.processed
+        setPollProgress({ done: totalProcessed, total: totalProcessed + (data.total ?? 0) })
+
         if (data.processed > 0) fetchEmails()
+        if (data.processed === 0) break  // plus rien à traiter
+
+      } catch (err) {
+        setPollResult(`Réseau : ${err instanceof Error ? err.message : 'inconnu'}`)
+        break
       }
-    } catch (err) {
-      setPollResult(`Erreur réseau`)
     }
+
+    setPollResult(totalProcessed > 0 ? `${totalProcessed} email(s) traité(s)` : 'Aucun nouveau mail')
     setPolling(false)
+    setPollProgress(null)
+    fetchUnreadCount()
     setTimeout(() => setPollResult(null), 8000)
   }
 
@@ -99,6 +128,7 @@ export default function Dashboard() {
   const handleAction = () => {
     setSelected(null)
     fetchEmails()
+    fetchUnreadCount()
   }
 
   const countForColumn = (classification: Classification) =>
@@ -188,19 +218,25 @@ export default function Dashboard() {
       {/* ── Barre du bas ── */}
       <div className="fixed bottom-4 right-6 text-xs text-gray-400 flex items-center gap-3">
 
-        {/* Résultat polling */}
-        {pollResult && (
+        {/* Résultat / progression */}
+        {polling && pollProgress ? (
+          <span className="text-gray-500 font-medium">
+            Traitement {pollProgress.done} / {pollProgress.total}...
+          </span>
+        ) : pollResult ? (
           <span className={`px-2.5 py-1 rounded-full font-medium ${
-            pollResult.startsWith('Erreur') ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-700'
+            pollResult.startsWith('Erreur') || pollResult.startsWith('Réseau')
+              ? 'bg-red-50 text-red-600'
+              : 'bg-gray-100 text-gray-700'
           }`}>
             {pollResult}
           </span>
-        )}
+        ) : null}
 
-        {/* Badge mails en attente */}
-        {unreadCount > 0 && (
+        {/* Badge mails non lus */}
+        {unreadCount !== null && unreadCount > 0 && (
           <span className="bg-black text-white font-semibold px-2.5 py-0.5 rounded-full">
-            {unreadCount} en attente
+            {unreadCount} non lu{unreadCount > 1 ? 's' : ''}
           </span>
         )}
 

@@ -1,7 +1,8 @@
 // ============================================================
-// Polling Gmail — cron automatique toutes les 5 minutes (Netlify Pro)
+// Polling Gmail — déclenché manuellement (plan gratuit)
+// Sur Netlify Pro : activer le cron dans netlify.toml
 // ============================================================
-import type { Config } from '@netlify/functions';
+// import type { Config } from '@netlify/functions'; // à réactiver avec le cron
 import { getDb, corsHeaders, jsonResponse } from './_db.js';
 import { getGmailClient, extractBody, extractAttachments, getHeader, buildRawEmail } from './_gmail.js';
 import { classifyAndDraftEmail } from './_claude.js';
@@ -28,26 +29,6 @@ export default async function handler(req: Request) {
   const db = getDb();
 
   try {
-    // ── 0. Sync : retirer du dashboard les emails lus externalement dans Gmail ──
-    try {
-      const pendingRows = await db`SELECT id, gmail_id FROM emails WHERE status IN ('pending', 'locked')`;
-      const pending = (pendingRows as any[]);
-      if (pending.length > 0) {
-        const unreadRes = await gmail.users.messages.list({
-          userId: 'me',
-          q: 'is:unread -from:me newer_than:7d',
-          maxResults: 100,
-        });
-        const unreadIds = new Set((unreadRes.data.messages ?? []).map((m: any) => m.id));
-        const toSync = pending.filter(p => !unreadIds.has(p.gmail_id));
-        if (toSync.length > 0) {
-          const ids = toSync.map(p => p.id);
-          await db`UPDATE emails SET status = 'dismissed' WHERE id = ANY(${ids})`;
-          console.log(`[poll-emails] ${toSync.length} email(s) lus dans Gmail → dismissed`);
-        }
-      }
-    } catch {/* silencieux */}
-
     // ── 1. Charger le guide, les exemples et les règles depuis la BDD ──
     const [guideRows, exampleRows, ruleRows] = await Promise.all([
       db`SELECT content FROM guide ORDER BY updated_at DESC LIMIT 1`,
@@ -67,7 +48,7 @@ export default async function handler(req: Request) {
     const listRes = await gmail.users.messages.list({
       userId: 'me',
       q: 'is:unread -from:me newer_than:3d',
-      maxResults: 50,
+      maxResults: 10, // plusieurs pour trouver le prochain non traité
     });
 
     const messages = listRes.data.messages ?? [];
@@ -175,7 +156,7 @@ export default async function handler(req: Request) {
               to:      alertAddress,
               from:    senderEmail,
               subject: '🚨 MAIL URGENT SUR LA BOITE COACH',
-              body: `Un email urgent vient d'arriver sur la boîte Coachello.\n\nDe : ${fromName ? `${fromName} ` : ''}${fromEmail}\nObjet : ${subject}\n\nAnalyse : ${result.reasoning}\n\n→ Traiter sur https://coachello-mail-agent.netlify.app`,
+              body: `Un email urgent vient d'arriver sur la boîte Coachello.\n\nDe : ${fromName ? `${fromName} ` : ''}${fromEmail}\nObjet : ${subject}\n\nAnalyse : ${result.reasoning}\n\n→ Traiter sur https://coachello-email-agent.netlify.app`,
             });
             await gmail.users.messages.send({
               userId: 'me',
@@ -189,6 +170,7 @@ export default async function handler(req: Request) {
 
         processed++;
         console.log(`[poll-emails] ✓ ${fromEmail} — ${subject} → ${result.classification}`);
+        break; // 1 email traité par appel (anti-timeout), le suivant sera pris au prochain appel
 
       } catch (err) {
         console.error(`[poll-emails] ✗ Erreur sur email ${gmailId}:`, err);
@@ -208,4 +190,6 @@ export default async function handler(req: Request) {
   }
 }
 
-export const config: Config = { schedule: '0 */3 * * *' };
+// Plan gratuit : fonction déclenchée manuellement via GET /.netlify/functions/poll-emails
+// Pour activer le cron automatique, upgrader vers Netlify Pro et décommenter :
+// export const config: Config = { schedule: '*/20 * * * *' };

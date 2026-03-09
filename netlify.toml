@@ -6,19 +6,15 @@
   directory      = "netlify/functions"
   node_bundler   = "esbuild"
 
-# ── Scheduled Function — Netlify Pro ──
-[functions."poll-emails"]
-  schedule = "0 */3 * * *"
+# ── Scheduled Function désactivée (plan gratuit) ──
+# Décommenter + upgrader vers Pro pour activer le cron automatique :
+# [functions."poll-emails"]
+#   schedule = "*/20 * * * *"
 
 # ── Redirections API → Netlify Functions ──
 [[redirects]]
   from   = "/api/poll"
   to     = "/.netlify/functions/poll-emails"
-  status = 200
-
-[[redirects]]
-  from   = "/api/manual-poll"
-  to     = "/.netlify/functions/manual-poll"
   status = 200
 
 [[redirects]]
