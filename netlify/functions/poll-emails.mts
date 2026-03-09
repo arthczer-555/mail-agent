@@ -1,8 +1,7 @@
 // ============================================================
-// Polling Gmail — déclenché manuellement (plan gratuit)
-// Sur Netlify Pro : activer le cron dans netlify.toml
+// Polling Gmail — cron automatique toutes les 5 minutes (Netlify Pro)
 // ============================================================
-// import type { Config } from '@netlify/functions'; // à réactiver avec le cron
+import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse } from './_db.js';
 import { getGmailClient, extractBody, extractAttachments, getHeader, buildRawEmail } from './_gmail.js';
 import { classifyAndDraftEmail } from './_claude.js';
@@ -68,7 +67,7 @@ export default async function handler(req: Request) {
     const listRes = await gmail.users.messages.list({
       userId: 'me',
       q: 'is:unread -from:me newer_than:3d',
-      maxResults: 10, // plusieurs pour trouver le prochain non traité
+      maxResults: 50,
     });
 
     const messages = listRes.data.messages ?? [];
@@ -176,7 +175,7 @@ export default async function handler(req: Request) {
               to:      alertAddress,
               from:    senderEmail,
               subject: '🚨 MAIL URGENT SUR LA BOITE COACH',
-              body: `Un email urgent vient d'arriver sur la boîte Coachello.\n\nDe : ${fromName ? `${fromName} ` : ''}${fromEmail}\nObjet : ${subject}\n\nAnalyse : ${result.reasoning}\n\n→ Traiter sur https://coachello-email-agent.netlify.app`,
+              body: `Un email urgent vient d'arriver sur la boîte Coachello.\n\nDe : ${fromName ? `${fromName} ` : ''}${fromEmail}\nObjet : ${subject}\n\nAnalyse : ${result.reasoning}\n\n→ Traiter sur https://coachello-mail-agent.netlify.app`,
             });
             await gmail.users.messages.send({
               userId: 'me',
@@ -190,7 +189,6 @@ export default async function handler(req: Request) {
 
         processed++;
         console.log(`[poll-emails] ✓ ${fromEmail} — ${subject} → ${result.classification}`);
-        break; // 1 email traité par appel (anti-timeout), le suivant sera pris au prochain appel
 
       } catch (err) {
         console.error(`[poll-emails] ✗ Erreur sur email ${gmailId}:`, err);
@@ -210,6 +208,4 @@ export default async function handler(req: Request) {
   }
 }
 
-// Plan gratuit : fonction déclenchée manuellement via GET /.netlify/functions/poll-emails
-// Pour activer le cron automatique, upgrader vers Netlify Pro et décommenter :
-// export const config: Config = { schedule: '*/20 * * * *' };
+export const config: Config = { schedule: '0 */3 * * *' };

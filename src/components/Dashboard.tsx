@@ -34,10 +34,9 @@ export default function Dashboard() {
   const [selectedEmail, setSelected]  = useState<Email | null>(null)
   const [loading, setLoading]         = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
-  const [polling, setPolling]         = useState(false)
-  const [pollResult, setPollResult]   = useState<string | null>(null)
-  const [refreshed, setRefreshed]     = useState(false)
-  const [pollProgress, setPollProgress] = useState<{ done: number; total: number } | null>(null)
+  const [polling, setPolling]     = useState(false)
+  const [pollResult, setPollResult] = useState<string | null>(null)
+  const [refreshed, setRefreshed] = useState(false)
   const [unreadCount, setUnreadCount] = useState<number | null>(null)
 
   const fetchEmails = useCallback(async () => {
@@ -88,38 +87,19 @@ export default function Dashboard() {
   const handlePoll = async () => {
     setPolling(true)
     setPollResult(null)
-    setPollProgress(null)
-
-    let totalProcessed = 0
-    const MAX_ITERATIONS = 20
-
-    for (let i = 0; i < MAX_ITERATIONS; i++) {
-      try {
-        const res  = await fetch('/api/poll')
-        const text = await res.text()
-        let data: any
-        try { data = JSON.parse(text) } catch { data = null }
-
-        if (!res.ok || !data?.success) {
-          setPollResult(`Erreur ${res.status} — voir logs Netlify`)
-          break
-        }
-
-        totalProcessed += data.processed
-        setPollProgress({ done: totalProcessed, total: totalProcessed + (data.total ?? 0) })
-
+    try {
+      const res  = await fetch('/api/poll')
+      const data = await res.json()
+      if (!res.ok || !data?.success) {
+        setPollResult(`Erreur ${res.status}`)
+      } else {
+        setPollResult(data.processed > 0 ? `${data.processed} email(s) traité(s)` : 'Aucun nouveau mail')
         if (data.processed > 0) fetchEmails()
-        if (data.processed === 0) break  // plus rien à traiter
-
-      } catch (err) {
-        setPollResult(`Réseau : ${err instanceof Error ? err.message : 'inconnu'}`)
-        break
       }
+    } catch (err) {
+      setPollResult(`Réseau : ${err instanceof Error ? err.message : 'inconnu'}`)
     }
-
-    setPollResult(totalProcessed > 0 ? `${totalProcessed} email(s) traité(s)` : 'Aucun nouveau mail')
     setPolling(false)
-    setPollProgress(null)
     fetchUnreadCount()
     setTimeout(() => setPollResult(null), 8000)
   }
@@ -219,17 +199,13 @@ export default function Dashboard() {
       <div className="fixed bottom-4 right-6 text-xs text-gray-400 flex items-center gap-3">
 
         {/* Résultat / progression */}
-        {polling && pollProgress ? (
-          <span className="text-gray-500 font-medium">
-            Traitement {pollProgress.done} / {pollProgress.total}...
-          </span>
-        ) : pollResult ? (
+        {pollResult ? (
           <span className={`px-2.5 py-1 rounded-full font-medium ${
             pollResult.startsWith('Erreur') || pollResult.startsWith('Réseau')
               ? 'bg-red-50 text-red-600'
               : 'bg-gray-100 text-gray-700'
           }`}>
-            {pollResult}
+            {polling ? 'Polling...' : pollResult}
           </span>
         ) : null}
 
