@@ -2,7 +2,6 @@
 // Polling manuel — déclenché via bouton depuis le dashboard
 // Traite 1 email à la fois (anti-timeout 26s Netlify)
 // ============================================================
-import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse } from './_db.js';
 import { getGmailClient, extractBody, extractAttachments, getHeader, buildRawEmail } from './_gmail.js';
 import { classifyAndDraftEmail } from './_claude.js';
@@ -160,4 +159,3 @@ export default async function handler(req: Request) {
   }
 }
 
-export const config: Config = { path: '/api/manual-poll' };
