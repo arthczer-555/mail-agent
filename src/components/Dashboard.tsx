@@ -95,7 +95,7 @@ export default function Dashboard() {
       try { data = JSON.parse(text) } catch { data = null }
 
       if (!res.ok || !data?.success) {
-        setPollResult(`Erreur ${res.status}`)
+        setPollResult(`Erreur ${res.status}${data?.error ? ` : ${data.error}` : ''}`)
       } else {
         setPollResult(data.processed > 0 ? `${data.processed} email(s) traité(s)` : 'Aucun nouveau mail')
         if (data.processed > 0) fetchEmails()
