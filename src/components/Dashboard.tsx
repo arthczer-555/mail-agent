@@ -34,10 +34,14 @@ export default function Dashboard() {
   const [selectedEmail, setSelected]  = useState<Email | null>(null)
   const [loading, setLoading]         = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
-  const [polling, setPolling]     = useState(false)
+  const [polling, setPolling]       = useState(false)
   const [pollResult, setPollResult] = useState<string | null>(null)
-  const [refreshed, setRefreshed] = useState(false)
-  const [unreadCount, setUnreadCount] = useState<number | null>(null)
+  const [refreshed, setRefreshed]   = useState(false)
+
+  // Nombre d'emails en attente calculé depuis les stats (pas d'appel Gmail)
+  const unreadCount = stats
+    .filter(s => s.status === 'pending' || s.status === 'locked')
+    .reduce((sum, s) => sum + parseInt(s.count), 0)
 
   const fetchEmails = useCallback(async () => {
     try {
@@ -55,25 +59,11 @@ export default function Dashboard() {
     }
   }, [])
 
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const res  = await fetch('/api/poll?count=true')
-      const data = await res.json()
-      if (data.count !== undefined) setUnreadCount(data.count)
-    } catch {
-      // silencieux
-    }
-  }, [])
-
   useEffect(() => {
     fetchEmails()
-    fetchUnreadCount()
-    const interval = setInterval(() => {
-      fetchEmails()
-      fetchUnreadCount()
-    }, 2 * 60 * 1000)
+    const interval = setInterval(fetchEmails, 2 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [fetchEmails, fetchUnreadCount])
+  }, [fetchEmails])
 
   const handleOpen = (email: Email) => {
     setSelected(email)
@@ -88,8 +78,10 @@ export default function Dashboard() {
     setPolling(true)
     setPollResult(null)
     try {
-      const res  = await fetch('/api/poll')
-      const data = await res.json()
+      const res  = await fetch('/api/manual-poll')
+      const text = await res.text()
+      let data: any
+      try { data = JSON.parse(text) } catch { data = null }
       if (!res.ok || !data?.success) {
         setPollResult(`Erreur ${res.status}`)
       } else {
@@ -97,10 +89,9 @@ export default function Dashboard() {
         if (data.processed > 0) fetchEmails()
       }
     } catch (err) {
-      setPollResult(`Réseau : ${err instanceof Error ? err.message : 'inconnu'}`)
+      setPollResult(`Erreur réseau`)
     }
     setPolling(false)
-    fetchUnreadCount()
     setTimeout(() => setPollResult(null), 8000)
   }
 
@@ -108,7 +99,6 @@ export default function Dashboard() {
   const handleAction = () => {
     setSelected(null)
     fetchEmails()
-    fetchUnreadCount()
   }
 
   const countForColumn = (classification: Classification) =>
@@ -198,21 +188,19 @@ export default function Dashboard() {
       {/* ── Barre du bas ── */}
       <div className="fixed bottom-4 right-6 text-xs text-gray-400 flex items-center gap-3">
 
-        {/* Résultat / progression */}
-        {pollResult ? (
+        {/* Résultat polling */}
+        {pollResult && (
           <span className={`px-2.5 py-1 rounded-full font-medium ${
-            pollResult.startsWith('Erreur') || pollResult.startsWith('Réseau')
-              ? 'bg-red-50 text-red-600'
-              : 'bg-gray-100 text-gray-700'
+            pollResult.startsWith('Erreur') ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-700'
           }`}>
-            {polling ? 'Polling...' : pollResult}
+            {pollResult}
           </span>
-        ) : null}
+        )}
 
-        {/* Badge mails non lus */}
-        {unreadCount !== null && unreadCount > 0 && (
+        {/* Badge mails en attente */}
+        {unreadCount > 0 && (
           <span className="bg-black text-white font-semibold px-2.5 py-0.5 rounded-full">
-            {unreadCount} non lu{unreadCount > 1 ? 's' : ''}
+            {unreadCount} en attente
           </span>
         )}
 
