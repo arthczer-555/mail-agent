@@ -5,6 +5,7 @@
 import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse, errorResponse } from './_db.js';
 import { getGmailClient, buildRawEmail } from './_gmail.js';
+import { askClarifyingQuestions, redraftWithAnswers } from './_claude.js';
 
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {
@@ -181,6 +182,51 @@ export default async function handler(req: Request) {
         requestBody: { removeLabelIds: ['UNREAD'] },
       }).catch(() => {/* silencieux */});
       return jsonResponse({ success: true, action: 'draft_saved' });
+    }
+
+    // ──────────────────────────────────────────────────
+    // ACTION : ask (générer des questions de clarification)
+    // ──────────────────────────────────────────────────
+    if (action === 'ask') {
+      const guideRows = await db`SELECT content FROM guide ORDER BY updated_at DESC LIMIT 1`.catch(() => []);
+      const guide = (guideRows[0] as any)?.content ?? '';
+      const questions = await askClarifyingQuestions({
+        guide,
+        fromEmail: email.from_email,
+        fromName:  email.from_name,
+        subject:   email.subject,
+        body:      (email.body_text ?? '').slice(0, 3000),
+      });
+      return jsonResponse({ success: true, questions });
+    }
+
+    // ──────────────────────────────────────────────────
+    // ACTION : redraft (régénérer brouillon avec contexte)
+    // ──────────────────────────────────────────────────
+    if (action === 'redraft') {
+      const { questions, answers } = body as { questions?: string[]; answers?: string[] };
+      if (!questions?.length || !answers?.length) return errorResponse('questions et answers requis', 400);
+
+      const [guideRows, exampleRows, ruleRows] = await Promise.all([
+        db`SELECT content FROM guide ORDER BY updated_at DESC LIMIT 1`.catch(() => []),
+        db`SELECT email_body, ideal_response, classification FROM examples ORDER BY created_at DESC LIMIT 10`.catch(() => []),
+        db`SELECT rule_type, value, classification FROM classification_rules`.catch(() => []),
+      ]);
+
+      const newDraft = await redraftWithAnswers({
+        guide:     (guideRows[0] as any)?.content ?? '',
+        examples:  exampleRows as any[],
+        rules:     ruleRows as any[],
+        fromEmail: email.from_email,
+        fromName:  email.from_name,
+        subject:   email.subject,
+        body:      (email.body_text ?? '').slice(0, 3000),
+        questions,
+        answers,
+      });
+
+      await db`UPDATE emails SET draft_response = ${newDraft} WHERE id = ${emailId}`;
+      return jsonResponse({ success: true, draft: newDraft });
     }
 
     return errorResponse(`Action inconnue : ${action}`, 400);

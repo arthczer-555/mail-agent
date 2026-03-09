@@ -84,3 +84,73 @@ Classifie cet email et rédige un brouillon de réponse approprié.`;
 
   return result;
 }
+
+// ── Générer des questions de clarification ──────────────────────
+export async function askClarifyingQuestions(opts: {
+  guide: string;
+  fromEmail: string;
+  fromName: string;
+  subject: string;
+  body: string;
+}): Promise<string[]> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 600,
+    system: `Tu es l'assistant email de Coachello. Tu dois poser des questions à l'équipe pour pouvoir rédiger une meilleure réponse à un email.
+Génère 2 à 3 questions courtes et précises dont tu as besoin pour rédiger une réponse adaptée.
+Réponds UNIQUEMENT en JSON valide : { "questions": ["question 1", "question 2", "question 3"] }`,
+    messages: [{
+      role: 'user',
+      content: `Email reçu de ${opts.fromName} <${opts.fromEmail}> — Objet : ${opts.subject}\n\n${opts.body}\n\nQuelles informations manquent pour rédiger une réponse idéale ?`,
+    }],
+  });
+
+  const content = response.content[0];
+  if (content.type !== 'text') throw new Error('Réponse Claude inattendue');
+  const json = JSON.parse(content.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, ''));
+  return json.questions as string[];
+}
+
+// ── Régénérer le brouillon avec les réponses de l'équipe ────────
+export async function redraftWithAnswers(opts: {
+  guide: string;
+  examples: Array<{ email_body: string; ideal_response: string; classification: string }>;
+  rules: Array<{ rule_type: string; value: string; classification: string }>;
+  fromEmail: string;
+  fromName: string;
+  subject: string;
+  body: string;
+  questions: string[];
+  answers: string[];
+}): Promise<string> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const qaContext = opts.questions.map((q, i) =>
+    `Q: ${q}\nR: ${opts.answers[i] ?? '(sans réponse)'}`
+  ).join('\n\n');
+
+  const examplesText = opts.examples.length > 0
+    ? opts.examples.slice(0, 5).map((ex, i) =>
+        `Exemple ${i + 1} (${ex.classification}) — Email: ${ex.email_body.slice(0, 200)} → Réponse: ${ex.ideal_response.slice(0, 300)}`
+      ).join('\n\n')
+    : '';
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1200,
+    system: `Tu es l'assistant email de Coachello. Rédige un brouillon de réponse complet et prêt à envoyer.
+${opts.guide ? `\nGuide : ${opts.guide}` : ''}
+${examplesText ? `\nExemples de réponses validées :\n${examplesText}` : ''}
+Réponds UNIQUEMENT avec le texte de la réponse, sans introduction ni commentaire.`,
+    messages: [{
+      role: 'user',
+      content: `Email de ${opts.fromName} <${opts.fromEmail}> — Objet : ${opts.subject}\n\n${opts.body}\n\n---\nContexte fourni par l'équipe :\n\n${qaContext}`,
+    }],
+  });
+
+  const content = response.content[0];
+  if (content.type !== 'text') throw new Error('Réponse Claude inattendue');
+  return content.text.trim();
+}

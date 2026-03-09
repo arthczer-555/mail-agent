@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Component } from 'react'
 import { createPortal } from 'react-dom'
-import { Email, Classification, Stats, CLASSIFICATION_CONFIG } from '../types'
+import { Email, Classification, CLASSIFICATION_CONFIG } from '../types'
 import EmailCard from './EmailCard'
 import EmailDetail from './EmailDetail'
 
@@ -30,7 +30,6 @@ const COLUMNS: Classification[] = ['URGENT', 'IMPORTANT', 'NORMAL', 'FAIBLE']
 
 export default function Dashboard() {
   const [emails, setEmails]           = useState<Email[]>([])
-  const [stats, setStats]             = useState<Stats[]>([])
   const [selectedEmail, setSelected]  = useState<Email | null>(null)
   const [loading, setLoading]         = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
@@ -45,7 +44,6 @@ export default function Dashboard() {
       const res  = await fetch('/api/emails')
       const data = await res.json()
       setEmails(data.emails  ?? [])
-      setStats(data.stats    ?? [])
       setLastRefresh(new Date())
       setRefreshed(true)
       setTimeout(() => setRefreshed(false), 2000)
@@ -122,10 +120,6 @@ export default function Dashboard() {
   const countForColumn = (classification: Classification) =>
     emails.filter(e => e.classification === classification).length
 
-  const totalForColumn = (classification: Classification) => {
-    const relevant = stats.filter(s => s.classification === classification)
-    return relevant.reduce((sum, s) => sum + parseInt(s.count), 0)
-  }
 
   if (loading) {
     return (
@@ -156,12 +150,9 @@ export default function Dashboard() {
                   }`} />
                   <span className="font-semibold text-sm text-gray-800">{conf.label}</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${conf.badge}`}>
-                    {countForColumn(classification)}
-                  </span>
-                  <span className="text-xs text-gray-300">/ {totalForColumn(classification)}</span>
-                </div>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${conf.badge}`}>
+                  {countForColumn(classification)}
+                </span>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">

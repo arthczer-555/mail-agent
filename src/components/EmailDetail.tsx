@@ -14,15 +14,57 @@ function formatSize(bytes: number): string {
 }
 
 export default function EmailDetail({ email, onClose, onAction }: Props) {
-  const [response, setResponse] = useState(email.draft_response ?? '')
-  const [loading, setLoading]   = useState(false)
-  const [mode, setMode]         = useState<'view' | 'edit'>('view')
-  const [feedback, setFeedback] = useState<string | null>(null)
+  const [response, setResponse]   = useState(email.draft_response ?? '')
+  const [loading, setLoading]     = useState(false)
+  const [mode, setMode]           = useState<'view' | 'edit'>('view')
+  const [feedback, setFeedback]   = useState<string | null>(null)
+
+  // ── Clarifying questions ──
+  const [questions, setQuestions] = useState<string[]>([])
+  const [answers, setAnswers]     = useState<string[]>([])
+  const [askLoading, setAskLoading]     = useState(false)
+  const [redraftLoading, setRedraftLoading] = useState(false)
 
   const conf        = CLASSIFICATION_CONFIG[email.classification] ?? CLASSIFICATION_CONFIG['NORMAL']
   const body        = email.body_text || email.body_preview || '(corps vide)'
   const attachments = Array.isArray(email.attachments) ? email.attachments : []
   const gmailUrl    = `https://mail.google.com/mail/u/0/#inbox/${email.gmail_id}`
+
+  const handleAsk = async () => {
+    setAskLoading(true)
+    setQuestions([])
+    setAnswers([])
+    try {
+      const res  = await fetch(`/api/emails/${email.id}/ask`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Erreur')
+      setQuestions(data.questions ?? [])
+      setAnswers((data.questions ?? []).map(() => ''))
+    } catch (err) {
+      setFeedback(`Erreur : ${err instanceof Error ? err.message : 'inconnue'}`)
+    }
+    setAskLoading(false)
+  }
+
+  const handleRedraft = async () => {
+    setRedraftLoading(true)
+    try {
+      const res  = await fetch(`/api/emails/${email.id}/redraft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions, answers }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Erreur')
+      setResponse(data.draft ?? '')
+      setQuestions([])
+      setAnswers([])
+      setMode('view')
+    } catch (err) {
+      setFeedback(`Erreur : ${err instanceof Error ? err.message : 'inconnue'}`)
+    }
+    setRedraftLoading(false)
+  }
 
   const sendAction = async (action: 'validate' | 'reject' | 'draft') => {
     setLoading(true)
@@ -146,30 +188,85 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
         </div>
 
         {/* Droite : brouillon de réponse */}
-        <div className="overflow-y-auto p-5 flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Brouillon de réponse
-            </h3>
-            <button
-              onClick={() => setMode(mode === 'view' ? 'edit' : 'view')}
-              className="text-xs text-gray-400 hover:text-black underline underline-offset-2 transition-colors"
-            >
-              {mode === 'view' ? '✏️ Modifier' : '👁 Prévisualiser'}
-            </button>
+        <div className="overflow-y-auto p-5 flex flex-col gap-4">
+
+          {/* Brouillon */}
+          <div className="flex flex-col flex-1">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Brouillon de réponse
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleAsk}
+                  disabled={askLoading}
+                  className="text-xs text-indigo-500 hover:text-indigo-700 underline underline-offset-2 transition-colors disabled:opacity-40"
+                >
+                  {askLoading ? 'Réflexion...' : 'Demander des précisions'}
+                </button>
+                <span className="text-gray-200">|</span>
+                <button
+                  onClick={() => setMode(mode === 'view' ? 'edit' : 'view')}
+                  className="text-xs text-gray-400 hover:text-black underline underline-offset-2 transition-colors"
+                >
+                  {mode === 'view' ? '✏️ Modifier' : '👁 Aperçu'}
+                </button>
+              </div>
+            </div>
+
+            {mode === 'view' ? (
+              <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed flex-1">
+                {response || <span className="text-gray-400 italic">Aucun brouillon généré</span>}
+              </div>
+            ) : (
+              <textarea
+                value={response}
+                onChange={e => setResponse(e.target.value)}
+                className="flex-1 text-sm text-gray-700 leading-relaxed border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-black min-h-[200px]"
+                placeholder="Réponse..."
+              />
+            )}
           </div>
 
-          {mode === 'view' ? (
-            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed flex-1">
-              {response || <span className="text-gray-400 italic">Aucun brouillon généré</span>}
+          {/* Questions de clarification */}
+          {questions.length > 0 && (
+            <div className="border border-indigo-100 rounded-xl p-4 bg-indigo-50 flex flex-col gap-3">
+              <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wider">
+                Claude a besoin de précisions
+              </p>
+              {questions.map((q, i) => (
+                <div key={i} className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-700">{q}</label>
+                  <input
+                    type="text"
+                    value={answers[i] ?? ''}
+                    onChange={e => setAnswers(prev => { const a = [...prev]; a[i] = e.target.value; return a })}
+                    className="text-sm border border-indigo-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                    placeholder="Votre réponse..."
+                  />
+                </div>
+              ))}
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  onClick={() => { setQuestions([]); setAnswers([]) }}
+                  className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleRedraft}
+                  disabled={redraftLoading || answers.some(a => !a.trim())}
+                  className="btn-primary text-xs disabled:opacity-40"
+                >
+                  {redraftLoading ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
+                      Rédaction...
+                    </span>
+                  ) : 'Régénérer le brouillon'}
+                </button>
+              </div>
             </div>
-          ) : (
-            <textarea
-              value={response}
-              onChange={e => setResponse(e.target.value)}
-              className="flex-1 text-sm text-gray-700 leading-relaxed border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-black min-h-[200px]"
-              placeholder="Réponse..."
-            />
           )}
         </div>
       </div>
@@ -177,10 +274,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
       {/* ── Barre d'actions ── */}
       <div className="px-5 py-3 bg-white border-t border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
         <p className="text-xs text-gray-400">
-          {['NORMAL', 'FAIBLE'].includes(email.classification)
-            ? '→ "Brouillon Gmail" pour réviser dans Gmail · "Envoyer" pour envoyer directement'
-            : '→ "Brouillon Gmail" pour valider et envoyer depuis Gmail'
-          }
+          → "Brouillon Gmail" pour réviser dans Gmail · "Envoyer" pour envoyer directement
         </p>
 
         <div className="flex items-center gap-2">
@@ -195,7 +289,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
                 disabled={loading}
                 className="btn-danger text-sm"
               >
-                Rejeter
+                Mark as read
               </button>
               <button
                 onClick={() => sendAction('draft')}
@@ -204,22 +298,20 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
               >
                 {loading ? '...' : 'Brouillon Gmail'}
               </button>
-              {['NORMAL', 'FAIBLE'].includes(email.classification) && (
-                <button
-                  onClick={() => sendAction('validate')}
-                  disabled={loading || !response.trim()}
-                  className="btn-success text-sm"
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                      Envoi...
-                    </span>
-                  ) : (
-                    'Envoyer'
-                  )}
-                </button>
-              )}
+              <button
+                onClick={() => sendAction('validate')}
+                disabled={loading || !response.trim()}
+                className="btn-success text-sm"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    Envoi...
+                  </span>
+                ) : (
+                  'Envoyer'
+                )}
+              </button>
             </>
           )}
         </div>
