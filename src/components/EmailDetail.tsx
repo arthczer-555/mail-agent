@@ -30,14 +30,20 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
   const attachments = Array.isArray(email.attachments) ? email.attachments : []
   const gmailUrl    = `https://mail.google.com/mail/u/0/#inbox/${email.gmail_id}`
 
+  const parseApiResponse = async (res: Response) => {
+    const text = await res.text()
+    try { return { ok: res.ok, status: res.status, data: JSON.parse(text) } }
+    catch { return { ok: false, status: res.status, data: null, raw: text.slice(0, 100) } }
+  }
+
   const handleAsk = async () => {
     setAskLoading(true)
     setQuestions([])
     setAnswers([])
     try {
-      const res  = await fetch(`/api/emails/${email.id}/ask`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Erreur')
+      const res = await fetch(`/api/emails/${email.id}/ask`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      const { ok, status, data } = await parseApiResponse(res)
+      if (!ok || !data?.success) throw new Error(data?.error ?? `Erreur ${status}`)
       setQuestions(data.questions ?? [])
       setAnswers((data.questions ?? []).map(() => ''))
     } catch (err) {
@@ -49,13 +55,13 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
   const handleRedraft = async () => {
     setRedraftLoading(true)
     try {
-      const res  = await fetch(`/api/emails/${email.id}/redraft`, {
+      const res = await fetch(`/api/emails/${email.id}/redraft`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questions, answers }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Erreur')
+      const { ok, status, data } = await parseApiResponse(res)
+      if (!ok || !data?.success) throw new Error(data?.error ?? `Erreur ${status}`)
       setResponse(data.draft ?? '')
       setQuestions([])
       setAnswers([])
