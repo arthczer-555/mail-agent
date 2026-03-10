@@ -52,35 +52,38 @@ export default async function handler(req: Request) {
     const listRes = await gmail.users.messages.list({
       userId: 'me',
       q: 'is:unread -from:me newer_than:3d',
-      maxResults: 10,
+      maxResults: 20,
     });
 
     const messages = listRes.data.messages ?? [];
     console.log(`[manual-poll] ${messages.length} email(s) non lu(s) trouvé(s)`);
 
-    let processed = 0;
-    let skipped   = 0;
+    // ── Fix 1 : Auto-sync — rejeter les emails lus manuellement dans Gmail ──
+    const unreadGmailIds = new Set(messages.map(m => m.id).filter(Boolean) as string[]);
+    const pendingRows = await db`SELECT id, gmail_id FROM emails WHERE status = 'pending' AND created_at > NOW() - INTERVAL '7 days'`.catch(() => []);
+    const toAutoReject = (pendingRows as any[]).filter(r => r.gmail_id && !unreadGmailIds.has(r.gmail_id));
+    if (toAutoReject.length > 0) {
+      const ids = toAutoReject.map((r: any) => r.id);
+      await db`UPDATE emails SET status = 'rejected', validated_at = NOW() WHERE id = ANY(${ids})`.catch(() => {});
+      console.log(`[manual-poll] ${toAutoReject.length} email(s) lus dans Gmail → rejetés automatiquement`);
+    }
 
-    // ── 4. Traiter chaque email ──
-    for (const { id: gmailId, threadId } of messages) {
-      if (!gmailId) continue;
+    // ── 4. Traiter chaque email nouveau en parallèle ──
+    const toProcess = messages.filter(m => m.id && !processedIds.has(m.id!));
+    const skipped = messages.length - toProcess.length;
+    console.log(`[manual-poll] ${toProcess.length} email(s) à traiter, ${skipped} déjà traité(s)`);
 
-      // Déjà en base ? → skip
-      if (processedIds.has(gmailId)) {
-        skipped++;
-        continue;
-      }
-
+    const results = await Promise.all(toProcess.map(async ({ id: gmailId, threadId }) => {
       try {
         // Récupérer le contenu complet
         const msgRes = await gmail.users.messages.get({
           userId: 'me',
-          id: gmailId,
+          id: gmailId!,
           format: 'full',
         });
 
         const payload = msgRes.data.payload;
-        if (!payload) continue;
+        if (!payload) return 'skipped';
 
         const headers     = payload.headers ?? [];
         const fromRaw     = getHeader(headers, 'From');
@@ -104,10 +107,7 @@ export default async function handler(req: Request) {
         }
 
         // Ignorer les emails vraiment vides
-        if (effectiveBody.length < 5 && subject === '(sans objet)') {
-          skipped++;
-          continue;
-        }
+        if (effectiveBody.length < 5 && subject === '(sans objet)') return 'skipped';
 
         // ── 5. Appel Claude ──
         const result = await classifyAndDraftEmail({
@@ -171,14 +171,16 @@ export default async function handler(req: Request) {
           }
         }
 
-        processed++;
         console.log(`[manual-poll] ✓ ${fromEmail} — ${subject} → ${result.classification}`);
-        break; // 1 email traité par appel (anti-timeout)
+        return 'processed';
 
       } catch (err) {
         console.error(`[manual-poll] ✗ Erreur sur email ${gmailId}:`, err);
+        return 'error';
       }
-    }
+    }));
+
+    const processed = results.filter(r => r === 'processed').length;
 
     console.log(`[manual-poll] Terminé : ${processed} traité(s), ${skipped} ignoré(s)`);
     return jsonResponse({ success: true, processed, skipped, total: messages.length });

@@ -10,6 +10,10 @@
 [functions."poll-emails"]
   schedule = "0 * * * *"
 
+# ── Timeout explicite pour les actions email (Claude API) ──
+[functions."email-action"]
+  timeout = 26
+
 # ── Redirections API → Netlify Functions ──
 [[redirects]]
   from   = "/api/manual-poll"

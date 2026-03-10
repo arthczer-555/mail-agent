@@ -126,16 +126,16 @@ export async function redraftWithContext(opts: {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const examplesText = opts.examples.length > 0
-    ? opts.examples.slice(0, 5).map((ex, i) =>
-        `Exemple ${i + 1} (${ex.classification}) — Email: ${ex.email_body.slice(0, 200)} → Réponse: ${ex.ideal_response.slice(0, 300)}`
+    ? opts.examples.slice(0, 3).map((ex, i) =>
+        `Exemple ${i + 1} (${ex.classification}) — Email: ${ex.email_body.slice(0, 150)} → Réponse: ${ex.ideal_response.slice(0, 200)}`
       ).join('\n\n')
     : '';
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1200,
+    max_tokens: 800,
     system: `Tu es l'assistant email de Coachello. Rédige un brouillon de réponse complet et prêt à envoyer.
-${opts.guide ? `\nGuide : ${opts.guide}` : ''}
+${opts.guide ? `\nGuide : ${opts.guide.slice(0, 1000)}` : ''}
 ${examplesText ? `\nExemples de réponses validées :\n${examplesText}` : ''}
 Réponds UNIQUEMENT avec le texte de la réponse, sans introduction ni commentaire.`,
     messages: [{
@@ -168,16 +168,16 @@ export async function redraftWithAnswers(opts: {
   ).join('\n\n');
 
   const examplesText = opts.examples.length > 0
-    ? opts.examples.slice(0, 5).map((ex, i) =>
-        `Exemple ${i + 1} (${ex.classification}) — Email: ${ex.email_body.slice(0, 200)} → Réponse: ${ex.ideal_response.slice(0, 300)}`
+    ? opts.examples.slice(0, 3).map((ex, i) =>
+        `Exemple ${i + 1} (${ex.classification}) — Email: ${ex.email_body.slice(0, 150)} → Réponse: ${ex.ideal_response.slice(0, 200)}`
       ).join('\n\n')
     : '';
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1200,
+    max_tokens: 800,
     system: `Tu es l'assistant email de Coachello. Rédige un brouillon de réponse complet et prêt à envoyer.
-${opts.guide ? `\nGuide : ${opts.guide}` : ''}
+${opts.guide ? `\nGuide : ${opts.guide.slice(0, 1000)}` : ''}
 ${examplesText ? `\nExemples de réponses validées :\n${examplesText}` : ''}
 Réponds UNIQUEMENT avec le texte de la réponse, sans introduction ni commentaire.`,
     messages: [{
