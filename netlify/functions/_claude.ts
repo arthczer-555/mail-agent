@@ -116,31 +116,23 @@ Réponds UNIQUEMENT en JSON valide : { "questions": ["question 1", "question 2",
 // ── Régénérer le brouillon avec un contexte libre de l'équipe ──
 export async function redraftWithContext(opts: {
   guide: string;
-  examples: Array<{ email_body: string; ideal_response: string; classification: string }>;
   fromEmail: string;
   fromName: string;
   subject: string;
   body: string;
   context: string;
 }): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-  const examplesText = opts.examples.length > 0
-    ? opts.examples.slice(0, 3).map((ex, i) =>
-        `Exemple ${i + 1} (${ex.classification}) — Email: ${ex.email_body.slice(0, 150)} → Réponse: ${ex.ideal_response.slice(0, 200)}`
-      ).join('\n\n')
-    : '';
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 15000 });
 
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 800,
     system: `Tu es l'assistant email de Coachello. Rédige un brouillon de réponse complet et prêt à envoyer.
-${opts.guide ? `\nGuide : ${opts.guide.slice(0, 1000)}` : ''}
-${examplesText ? `\nExemples de réponses validées :\n${examplesText}` : ''}
+${opts.guide ? `\nGuide : ${opts.guide.slice(0, 800)}` : ''}
 Réponds UNIQUEMENT avec le texte de la réponse, sans introduction ni commentaire.`,
     messages: [{
       role: 'user',
-      content: `Email de ${opts.fromName} <${opts.fromEmail}> — Objet : ${opts.subject}\n\n${opts.body}\n\n---\nInstructions de l'équipe :\n${opts.context}`,
+      content: `Email de ${opts.fromName} <${opts.fromEmail}> — Objet : ${opts.subject}\n\n${opts.body.slice(0, 2000)}\n\n---\nInstructions de l'équipe :\n${opts.context}`,
     }],
   });
 

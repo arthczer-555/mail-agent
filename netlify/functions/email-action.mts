@@ -5,7 +5,7 @@
 import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse, errorResponse } from './_db.js';
 import { getGmailClient, buildRawEmail } from './_gmail.js';
-import { askClarifyingQuestions, redraftWithAnswers, redraftWithContext } from './_claude.js';
+import { askClarifyingQuestions, redraftWithContext } from './_claude.js';
 
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {
@@ -227,40 +227,19 @@ export default async function handler(req: Request) {
     // ACTION : redraft (régénérer brouillon avec contexte)
     // ──────────────────────────────────────────────────
     if (action === 'redraft') {
-      const { questions, answers, context } = body as { questions?: string[]; answers?: string[]; context?: string };
+      const { context } = body as { context?: string };
+      if (!context) return errorResponse('context requis', 400);
 
-      const [guideRows, exampleRows, ruleRows] = await Promise.all([
-        db`SELECT content FROM guide ORDER BY updated_at DESC LIMIT 1`.catch(() => []),
-        db`SELECT email_body, ideal_response, classification FROM examples ORDER BY created_at DESC LIMIT 10`.catch(() => []),
-        db`SELECT rule_type, value, classification FROM classification_rules`.catch(() => []),
-      ]);
+      const guideRows = await db`SELECT content FROM guide ORDER BY updated_at DESC LIMIT 1`.catch(() => []);
 
-      let newDraft: string;
-
-      if (context) {
-        newDraft = await redraftWithContext({
-          guide:     (guideRows[0] as any)?.content ?? '',
-          examples:  exampleRows as any[],
-          fromEmail: email.from_email,
-          fromName:  email.from_name,
-          subject:   email.subject,
-          body:      (email.body_text ?? '').slice(0, 3000),
-          context,
-        });
-      } else {
-        if (!questions?.length || !answers?.length) return errorResponse('context ou questions+answers requis', 400);
-        newDraft = await redraftWithAnswers({
-          guide:     (guideRows[0] as any)?.content ?? '',
-          examples:  exampleRows as any[],
-          rules:     ruleRows as any[],
-          fromEmail: email.from_email,
-          fromName:  email.from_name,
-          subject:   email.subject,
-          body:      (email.body_text ?? '').slice(0, 3000),
-          questions,
-          answers,
-        });
-      }
+      const newDraft = await redraftWithContext({
+        guide:     (guideRows[0] as any)?.content ?? '',
+        fromEmail: email.from_email,
+        fromName:  email.from_name,
+        subject:   email.subject,
+        body:      (email.body_text ?? '').slice(0, 3000),
+        context,
+      });
 
       await db`UPDATE emails SET draft_response = ${newDraft} WHERE id = ${emailId}`;
       return jsonResponse({ success: true, draft: newDraft });
