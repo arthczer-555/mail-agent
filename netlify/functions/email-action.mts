@@ -5,7 +5,7 @@
 import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse, errorResponse } from './_db.js';
 import { getGmailClient, buildRawEmail } from './_gmail.js';
-import { askClarifyingQuestions, redraftWithAnswers } from './_claude.js';
+import { askClarifyingQuestions, redraftWithAnswers, redraftWithContext } from './_claude.js';
 
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {
@@ -83,6 +83,29 @@ export default async function handler(req: Request) {
         }).catch(() => {/* silencieux */});
       }
       return jsonResponse({ success: true, action: 'rejected' });
+    }
+
+    // ──────────────────────────────────────────────────
+    // ACTION : report (marquer comme spam dans Gmail)
+    // ──────────────────────────────────────────────────
+    if (action === 'report') {
+      if (email.gmail_id) {
+        const gmail = getGmailClient();
+        await gmail.users.messages.modify({
+          userId: 'me',
+          id: email.gmail_id,
+          requestBody: {
+            addLabelIds: ['SPAM'],
+            removeLabelIds: ['INBOX', 'UNREAD'],
+          },
+        }).catch(() => {/* silencieux */});
+      }
+      await db`
+        UPDATE emails
+        SET status = 'rejected', validated_by = ${user}, validated_at = NOW()
+        WHERE id = ${emailId}
+      `;
+      return jsonResponse({ success: true, action: 'reported' });
     }
 
     // ──────────────────────────────────────────────────
@@ -204,8 +227,7 @@ export default async function handler(req: Request) {
     // ACTION : redraft (régénérer brouillon avec contexte)
     // ──────────────────────────────────────────────────
     if (action === 'redraft') {
-      const { questions, answers } = body as { questions?: string[]; answers?: string[] };
-      if (!questions?.length || !answers?.length) return errorResponse('questions et answers requis', 400);
+      const { questions, answers, context } = body as { questions?: string[]; answers?: string[]; context?: string };
 
       const [guideRows, exampleRows, ruleRows] = await Promise.all([
         db`SELECT content FROM guide ORDER BY updated_at DESC LIMIT 1`.catch(() => []),
@@ -213,17 +235,32 @@ export default async function handler(req: Request) {
         db`SELECT rule_type, value, classification FROM classification_rules`.catch(() => []),
       ]);
 
-      const newDraft = await redraftWithAnswers({
-        guide:     (guideRows[0] as any)?.content ?? '',
-        examples:  exampleRows as any[],
-        rules:     ruleRows as any[],
-        fromEmail: email.from_email,
-        fromName:  email.from_name,
-        subject:   email.subject,
-        body:      (email.body_text ?? '').slice(0, 3000),
-        questions,
-        answers,
-      });
+      let newDraft: string;
+
+      if (context) {
+        newDraft = await redraftWithContext({
+          guide:     (guideRows[0] as any)?.content ?? '',
+          examples:  exampleRows as any[],
+          fromEmail: email.from_email,
+          fromName:  email.from_name,
+          subject:   email.subject,
+          body:      (email.body_text ?? '').slice(0, 3000),
+          context,
+        });
+      } else {
+        if (!questions?.length || !answers?.length) return errorResponse('context ou questions+answers requis', 400);
+        newDraft = await redraftWithAnswers({
+          guide:     (guideRows[0] as any)?.content ?? '',
+          examples:  exampleRows as any[],
+          rules:     ruleRows as any[],
+          fromEmail: email.from_email,
+          fromName:  email.from_name,
+          subject:   email.subject,
+          body:      (email.body_text ?? '').slice(0, 3000),
+          questions,
+          answers,
+        });
+      }
 
       await db`UPDATE emails SET draft_response = ${newDraft} WHERE id = ${emailId}`;
       return jsonResponse({ success: true, draft: newDraft });

@@ -19,10 +19,9 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
   const [mode, setMode]           = useState<'view' | 'edit'>('view')
   const [feedback, setFeedback]   = useState<string | null>(null)
 
-  // ── Clarifying questions ──
-  const [questions, setQuestions] = useState<string[]>([])
-  const [answers, setAnswers]     = useState<string[]>([])
-  const [askLoading, setAskLoading]     = useState(false)
+  // ── Context panel ──
+  const [contextText, setContextText]   = useState('')
+  const [showContext, setShowContext]   = useState(false)
   const [redraftLoading, setRedraftLoading] = useState(false)
 
   const conf        = CLASSIFICATION_CONFIG[email.classification] ?? CLASSIFICATION_CONFIG['NORMAL']
@@ -36,35 +35,20 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
     catch { return { ok: false, status: res.status, data: null, raw: text.slice(0, 100) } }
   }
 
-  const handleAsk = async () => {
-    setAskLoading(true)
-    setQuestions([])
-    setAnswers([])
-    try {
-      const res = await fetch(`/api/emails/${email.id}/ask`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
-      const { ok, status, data } = await parseApiResponse(res)
-      if (!ok || !data?.success) throw new Error(data?.error ?? `Erreur ${status}`)
-      setQuestions(data.questions ?? [])
-      setAnswers((data.questions ?? []).map(() => ''))
-    } catch (err) {
-      setFeedback(`Erreur : ${err instanceof Error ? err.message : 'inconnue'}`)
-    }
-    setAskLoading(false)
-  }
-
   const handleRedraft = async () => {
+    if (!contextText.trim()) return
     setRedraftLoading(true)
     try {
       const res = await fetch(`/api/emails/${email.id}/redraft`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questions, answers }),
+        body: JSON.stringify({ context: contextText }),
       })
       const { ok, status, data } = await parseApiResponse(res)
       if (!ok || !data?.success) throw new Error(data?.error ?? `Erreur ${status}`)
       setResponse(data.draft ?? '')
-      setQuestions([])
-      setAnswers([])
+      setContextText('')
+      setShowContext(false)
       setMode('view')
     } catch (err) {
       setFeedback(`Erreur : ${err instanceof Error ? err.message : 'inconnue'}`)
@@ -72,7 +56,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
     setRedraftLoading(false)
   }
 
-  const sendAction = async (action: 'validate' | 'reject' | 'draft') => {
+  const sendAction = async (action: 'validate' | 'reject' | 'draft' | 'report') => {
     setLoading(true)
     setFeedback(null)
     try {
@@ -91,8 +75,11 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
       } else if (action === 'draft') {
         setFeedback('Brouillon enregistré dans Gmail ✓')
         setTimeout(onAction, 1200)
+      } else if (action === 'report') {
+        setFeedback('Email signalé comme spam ✓')
+        setTimeout(onAction, 800)
       } else {
-        setFeedback('Email rejeté')
+        setFeedback('Email marqué comme lu')
         setTimeout(onAction, 800)
       }
     } catch (err: unknown) {
@@ -204,11 +191,10 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
               </h3>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleAsk}
-                  disabled={askLoading}
-                  className="text-xs text-indigo-500 hover:text-indigo-700 underline underline-offset-2 transition-colors disabled:opacity-40"
+                  onClick={() => setShowContext(v => !v)}
+                  className="text-xs text-indigo-500 hover:text-indigo-700 underline underline-offset-2 transition-colors"
                 >
-                  {askLoading ? 'Réflexion...' : 'Demander des précisions'}
+                  {showContext ? 'Masquer' : 'Donner du contexte'}
                 </button>
                 <span className="text-gray-200">|</span>
                 <button
@@ -234,34 +220,29 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
             )}
           </div>
 
-          {/* Questions de clarification */}
-          {questions.length > 0 && (
+          {/* Panneau contexte libre */}
+          {showContext && (
             <div className="border border-indigo-100 rounded-xl p-4 bg-indigo-50 flex flex-col gap-3">
               <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wider">
-                Claude a besoin de précisions
+                Contexte / instructions pour Claude
               </p>
-              {questions.map((q, i) => (
-                <div key={i} className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-700">{q}</label>
-                  <input
-                    type="text"
-                    value={answers[i] ?? ''}
-                    onChange={e => setAnswers(prev => { const a = [...prev]; a[i] = e.target.value; return a })}
-                    className="text-sm border border-indigo-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-                    placeholder="Votre réponse..."
-                  />
-                </div>
-              ))}
+              <textarea
+                value={contextText}
+                onChange={e => setContextText(e.target.value)}
+                rows={4}
+                className="text-sm border border-indigo-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white resize-none"
+                placeholder="Ex: répondre en anglais, mentionner l'offre Pro, ton formel, proposer un appel..."
+              />
               <div className="flex items-center justify-between pt-1">
                 <button
-                  onClick={() => { setQuestions([]); setAnswers([]) }}
+                  onClick={() => { setShowContext(false); setContextText('') }}
                   className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handleRedraft}
-                  disabled={redraftLoading || answers.some(a => !a.trim())}
+                  disabled={redraftLoading || !contextText.trim()}
                   className="btn-primary text-xs disabled:opacity-40"
                 >
                   {redraftLoading ? (
@@ -269,7 +250,7 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
                       <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
                       Rédaction...
                     </span>
-                  ) : 'Régénérer le brouillon'}
+                  ) : 'Régénérer →'}
                 </button>
               </div>
             </div>
@@ -291,9 +272,16 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
           ) : (
             <>
               <button
-                onClick={() => sendAction('reject')}
+                onClick={() => sendAction('report')}
                 disabled={loading}
                 className="btn-danger text-sm"
+              >
+                Signaler
+              </button>
+              <button
+                onClick={() => sendAction('reject')}
+                disabled={loading}
+                className="btn-ghost text-sm"
               >
                 Mark as read
               </button>
