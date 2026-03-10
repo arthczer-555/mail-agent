@@ -41,9 +41,11 @@ export default function Dashboard() {
 
   const fetchEmails = useCallback(async () => {
     try {
-      const res  = await fetch('/api/emails')
-      const data = await res.json()
-      setEmails(data.emails  ?? [])
+      const res      = await fetch('/api/emails')
+      const data     = await res.json()
+      const newEmails: Email[] = data.emails ?? []
+      setEmails(newEmails)
+      setSelected(prev => prev ? (newEmails.find(e => e.id === prev.id) ?? prev) : null)
       setLastRefresh(new Date())
       setRefreshed(true)
       setTimeout(() => setRefreshed(false), 2000)
@@ -187,6 +189,7 @@ export default function Dashboard() {
                 email={selectedEmail}
                 onClose={handleClose}
                 onAction={handleAction}
+                onRefresh={fetchEmails}
               />
             </ModalErrorBoundary>
           </div>

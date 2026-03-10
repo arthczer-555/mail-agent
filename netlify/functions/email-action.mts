@@ -5,7 +5,7 @@
 import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse, errorResponse } from './_db.js';
 import { getGmailClient, buildRawEmail } from './_gmail.js';
-import { askClarifyingQuestions, redraftWithContext } from './_claude.js';
+import { askClarifyingQuestions } from './_claude.js';
 
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {
@@ -221,32 +221,6 @@ export default async function handler(req: Request) {
         body:      (email.body_text ?? '').slice(0, 3000),
       });
       return jsonResponse({ success: true, questions });
-    }
-
-    // ──────────────────────────────────────────────────
-    // ACTION : redraft (régénérer brouillon avec contexte)
-    // ──────────────────────────────────────────────────
-    if (action === 'redraft') {
-      const { context } = body as { context?: string };
-      if (!context) return errorResponse('context requis', 400);
-
-      const [guideRows, exampleRows] = await Promise.all([
-        db`SELECT content FROM guide ORDER BY updated_at DESC LIMIT 1`.catch(() => []),
-        db`SELECT email_body, ideal_response, classification FROM examples ORDER BY created_at DESC LIMIT 5`.catch(() => []),
-      ]);
-
-      const newDraft = await redraftWithContext({
-        guide:     (guideRows[0] as any)?.content ?? '',
-        examples:  exampleRows as any[],
-        fromEmail: email.from_email,
-        fromName:  email.from_name,
-        subject:   email.subject,
-        body:      (email.body_text ?? '').slice(0, 3000),
-        context,
-      });
-
-      await db`UPDATE emails SET draft_response = ${newDraft} WHERE id = ${emailId}`;
-      return jsonResponse({ success: true, draft: newDraft });
     }
 
     return errorResponse(`Action inconnue : ${action}`, 400);

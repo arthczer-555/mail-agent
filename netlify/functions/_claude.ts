@@ -123,7 +123,7 @@ export async function redraftWithContext(opts: {
   body: string;
   context: string;
 }): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 15000 });
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const examplesText = opts.examples.length > 0
     ? opts.examples.slice(0, 3).map((ex, i) =>
