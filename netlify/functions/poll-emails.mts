@@ -124,7 +124,7 @@ export default async function handler(req: Request) {
               subject, body_text, body_html, received_at,
               classification, reasoning, draft_response, status, attachments
             ) VALUES (
-              ${gmailId}, ${threadId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw},
+              ${gmailId}, ${threadId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw ?? ''}, 
               ${subject}, ${bodyText}, ${bodyHtml}, ${receivedAt},
               ${result.classification}, ${result.reasoning}, ${result.draft_response}, 'pending',
               ${JSON.stringify(attachments)}::jsonb
@@ -138,7 +138,7 @@ export default async function handler(req: Request) {
               subject, body_text, body_html, received_at,
               classification, reasoning, draft_response, status
             ) VALUES (
-              ${gmailId}, ${threadId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw},
+              ${gmailId}, ${threadId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw ?? ''}, 
               ${subject}, ${bodyText}, ${bodyHtml}, ${receivedAt},
               ${result.classification}, ${result.reasoning}, ${result.draft_response}, 'pending'
             )
