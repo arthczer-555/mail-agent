@@ -114,18 +114,25 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
       hour: '2-digit', minute: '2-digit',
     })
 
+  const BADGE_STYLE: Record<string, string> = {
+    URGENT:    'bg-[#FEE9E5] text-[#C23B2A]',
+    IMPORTANT: 'bg-[#FFF3E5] text-[#B05A10]',
+    NORMAL:    'bg-[#E8F0FF] text-[#2850A8]',
+    FAIBLE:    'bg-[#F0F0F0] text-[#666]',
+  }
+
   return (
     <div className="bg-white flex flex-col" style={{ maxHeight: '90vh' }}>
 
       {/* ── En-tête ── */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white flex-shrink-0">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-[#F0EDE8] bg-white flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${conf.badge}`}>
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 uppercase tracking-wide ${BADGE_STYLE[email.classification] ?? BADGE_STYLE['NORMAL']}`}>
             {conf.label}
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{email.subject}</p>
-            <p className="text-xs text-gray-400 truncate">
+            <p className="text-sm font-semibold text-[#1a1a1a] truncate">{email.subject}</p>
+            <p className="text-xs text-[#aaa] truncate">
               {email.from_name && `${email.from_name} · `}{email.from_email} · {formatDate(email.received_at)}
             </p>
           </div>
@@ -135,13 +142,13 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
             href={gmailUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-xs text-gray-400 hover:text-black underline underline-offset-2 transition-colors"
+            className="text-xs text-[#aaa] hover:text-[#E8452A] underline underline-offset-2 transition-colors"
           >
             Ouvrir dans Gmail
           </a>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-700"
+            className="p-1.5 hover:bg-[#F5F0EA] rounded-full transition-colors text-[#bbb] hover:text-[#555]"
             title="Fermer"
           >
             ✕
@@ -150,15 +157,15 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
       </div>
 
       {/* ── Corps : email + brouillon ── */}
-      <div className="flex-1 overflow-hidden grid grid-cols-2 divide-x divide-gray-100" style={{ minHeight: 0 }}>
+      <div className="flex-1 overflow-hidden grid grid-cols-2 divide-x divide-[#F0EDE8]" style={{ minHeight: 0 }}>
 
         {/* Gauche : email reçu */}
         <div className="overflow-y-auto p-5 flex flex-col gap-4">
           <div>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            <h3 className="text-[10px] font-bold text-[#bbb] uppercase tracking-widest mb-3">
               Email reçu
             </h3>
-            <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+            <div className="text-sm text-[#444] whitespace-pre-wrap leading-relaxed">
               {body}
             </div>
           </div>
@@ -166,22 +173,22 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
           {/* Pièces jointes */}
           {attachments.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              <h3 className="text-[10px] font-bold text-[#bbb] uppercase tracking-widest mb-2">
                 Pièces jointes ({attachments.length})
               </h3>
               <div className="flex flex-col gap-1.5">
                 {attachments.map((att, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
+                  <div key={i} className="flex items-center gap-2 bg-[#F7F5F2] border border-[#EDE8E0] rounded-xl px-3 py-2">
                     <span className="text-base">📎</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-800 truncate">{att.filename}</p>
-                      <p className="text-xs text-gray-400">{formatSize(att.size)}</p>
+                      <p className="text-xs font-medium text-[#333] truncate">{att.filename}</p>
+                      <p className="text-xs text-[#aaa]">{formatSize(att.size)}</p>
                     </div>
                     <a
                       href={gmailUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-gray-400 hover:text-black flex-shrink-0 transition-colors"
+                      className="text-xs text-[#aaa] hover:text-[#E8452A] flex-shrink-0 transition-colors"
                     >
                       Voir dans Gmail
                     </a>
@@ -193,33 +200,33 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
 
           {/* Analyse Claude */}
           {email.reasoning && (
-            <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 mb-1">Analyse de l'agent</p>
-              <p className="text-xs text-gray-500 leading-relaxed">{email.reasoning}</p>
+            <div className="p-3 bg-[#F7F5F2] rounded-xl border border-[#EDE8E0]">
+              <p className="text-[10px] font-bold text-[#bbb] uppercase tracking-widest mb-1.5">Analyse de l'agent</p>
+              <p className="text-xs text-[#666] leading-relaxed">{email.reasoning}</p>
             </div>
           )}
         </div>
 
         {/* Droite : brouillon de réponse */}
-        <div className="overflow-y-auto p-5 flex flex-col gap-4">
+        <div className="overflow-y-auto p-5 flex flex-col gap-4 bg-[#FDFCFB]">
 
           {/* Brouillon */}
           <div className="flex flex-col flex-1">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <h3 className="text-[10px] font-bold text-[#bbb] uppercase tracking-widest">
                 Brouillon de réponse
               </h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowContext(v => !v)}
-                  className="text-xs text-indigo-500 hover:text-indigo-700 underline underline-offset-2 transition-colors"
+                  className="text-xs text-[#E8452A] hover:text-[#c83a22] underline underline-offset-2 transition-colors font-medium"
                 >
                   {showContext ? 'Masquer' : 'Donner du contexte'}
                 </button>
-                <span className="text-gray-200">|</span>
+                <span className="text-[#D8D0C5]">|</span>
                 <button
                   onClick={() => setMode(mode === 'view' ? 'edit' : 'view')}
-                  className="text-xs text-gray-400 hover:text-black underline underline-offset-2 transition-colors"
+                  className="text-xs text-[#aaa] hover:text-[#555] underline underline-offset-2 transition-colors"
                 >
                   {mode === 'view' ? '✏️ Modifier' : '👁 Aperçu'}
                 </button>
@@ -227,14 +234,14 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
             </div>
 
             {mode === 'view' ? (
-              <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed flex-1">
-                {response || <span className="text-gray-400 italic">Aucun brouillon généré</span>}
+              <div className="text-sm text-[#444] whitespace-pre-wrap leading-relaxed flex-1">
+                {response || <span className="text-[#ccc] italic">Aucun brouillon généré</span>}
               </div>
             ) : (
               <textarea
                 value={response}
                 onChange={e => setResponse(e.target.value)}
-                className="flex-1 text-sm text-gray-700 leading-relaxed border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-black min-h-[200px]"
+                className="flex-1 text-sm text-[#444] leading-relaxed border border-[#D8D0C5] rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#E8452A] min-h-[200px] bg-white"
                 placeholder="Réponse..."
               />
             )}
@@ -242,21 +249,21 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
 
           {/* Panneau contexte libre */}
           {showContext && (
-            <div className="border border-indigo-100 rounded-xl p-4 bg-indigo-50 flex flex-col gap-3">
-              <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wider">
+            <div className="border border-[#E8E2D9] rounded-xl p-4 bg-[#F7F5F2] flex flex-col gap-3">
+              <p className="text-[10px] font-bold text-[#aaa] uppercase tracking-widest">
                 Contexte / instructions pour Claude
               </p>
               <textarea
                 value={contextText}
                 onChange={e => setContextText(e.target.value)}
                 rows={4}
-                className="text-sm border border-indigo-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white resize-none"
+                className="text-sm border border-[#D8D0C5] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#E8452A] bg-white resize-none text-[#444]"
                 placeholder="Ex: répondre en anglais, mentionner l'offre Pro, ton formel, proposer un appel..."
               />
               <div className="flex items-center justify-between pt-1">
                 <button
                   onClick={() => { setShowContext(false); setContextText('') }}
-                  className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                  className="text-xs text-[#aaa] hover:text-[#555] underline underline-offset-2"
                 >
                   Annuler
                 </button>
@@ -279,14 +286,14 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
       </div>
 
       {/* ── Barre d'actions ── */}
-      <div className="px-5 py-3 bg-white border-t border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
-        <p className="text-xs text-gray-400">
-          → "Brouillon Gmail" pour réviser dans Gmail · "Envoyer" pour envoyer directement
+      <div className="px-5 py-3 bg-white border-t border-[#F0EDE8] flex items-center justify-between gap-3 flex-shrink-0">
+        <p className="text-xs text-[#bbb]">
+          "Brouillon Gmail" pour réviser dans Gmail · "Envoyer" pour envoyer directement
         </p>
 
         <div className="flex items-center gap-2">
           {feedback ? (
-            <span className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full">
+            <span className="text-sm font-semibold text-[#555] bg-[#EDE8E0] px-3 py-1.5 rounded-full">
               {feedback}
             </span>
           ) : (

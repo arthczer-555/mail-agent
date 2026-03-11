@@ -1,4 +1,4 @@
-import { Email, CLASSIFICATION_CONFIG } from '../types'
+import { Email } from '../types'
 
 interface Props {
   email: Email
@@ -17,47 +17,39 @@ function timeAgo(dateStr: string): string {
   return `il y a ${days}j`
 }
 
-export default function EmailCard({ email, onOpen }: Props) {
-  const conf = CLASSIFICATION_CONFIG[email.classification]
+const LEFT_BORDER: Record<string, string> = {
+  URGENT:    '#E8452A',
+  IMPORTANT: '#F59E0B',
+  NORMAL:    '#3B6CF8',
+  FAIBLE:    'transparent',
+}
 
+export default function EmailCard({ email, onOpen }: Props) {
   return (
     <button
       onClick={() => onOpen(email)}
-      className="w-full text-left p-3.5 rounded-2xl border border-gray-100 bg-white transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 cursor-pointer shadow-sm"
+      className="w-full text-left bg-white border border-[#EDE8E0] rounded-2xl p-4 transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 cursor-pointer shadow-sm"
+      style={{ borderLeft: `3px solid ${LEFT_BORDER[email.classification] ?? 'transparent'}` }}
     >
-      {/* En-tête carte */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-gray-800 truncate">
-            {email.from_name || email.from_email}
-          </p>
-          <p className="text-xs text-gray-400 truncate">{email.from_email}</p>
-        </div>
-        <span className="text-xs text-gray-300 flex-shrink-0">{timeAgo(email.received_at)}</span>
+      {/* Expéditeur + heure */}
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <p className="text-[13px] font-semibold text-[#1a1a1a] truncate leading-tight">
+          {email.from_name || email.from_email}
+        </p>
+        <span className="text-[11px] text-[#bbb] flex-shrink-0 font-medium">{timeAgo(email.received_at)}</span>
       </div>
 
       {/* Objet */}
-      <p className="text-sm font-medium text-gray-900 truncate mb-2">
+      <p className="text-[12px] text-[#555] truncate mb-2 font-medium">
         {email.subject}
       </p>
 
-      {/* Aperçu du brouillon */}
+      {/* Aperçu brouillon */}
       {email.draft_preview && (
-        <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
+        <p className="text-[11px] text-[#aaa] line-clamp-2 leading-relaxed">
           {email.draft_preview}
         </p>
       )}
-
-      {/* Indicateur de classification */}
-      <div className={`mt-2 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${conf.badge}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${
-          email.classification === 'URGENT'    ? 'bg-red-500' :
-          email.classification === 'IMPORTANT' ? 'bg-orange-400' :
-          email.classification === 'NORMAL'    ? 'bg-blue-400' :
-          'bg-gray-400'
-        }`} />
-        {conf.label}
-      </div>
     </button>
   )
 }

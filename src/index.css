@@ -4,27 +4,30 @@
 
 @layer base {
   body {
-    @apply bg-[#f4f4f4] text-gray-900 font-sans;
+    background-color: #F5F0EA;
+    color: #1a1a1a;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer;
   }
   .btn-primary {
-    @apply btn bg-black text-white hover:bg-gray-800 active:scale-95;
+    @apply btn bg-[#E8452A] text-white hover:bg-[#c83a22] active:scale-95;
   }
   .btn-success {
-    @apply btn bg-black text-white hover:bg-gray-800 active:scale-95;
+    @apply btn bg-[#E8452A] text-white hover:bg-[#c83a22] active:scale-95;
   }
   .btn-danger {
-    @apply btn bg-white text-red-600 border border-red-200 hover:bg-red-50 active:scale-95;
+    @apply btn bg-[#FEE9E5] text-[#C23B2A] hover:bg-[#fdd4cc] active:scale-95;
   }
   .btn-ghost {
-    @apply btn bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 active:scale-95;
+    @apply btn bg-white text-[#555] border border-[#D8D0C5] hover:bg-[#F5F0EA] active:scale-95;
   }
   .card {
-    @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
+    @apply bg-white rounded-2xl border border-[#EDE8E0] shadow-sm;
   }
 }

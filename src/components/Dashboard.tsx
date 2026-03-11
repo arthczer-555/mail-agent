@@ -126,9 +126,16 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="animate-spin h-8 w-8 border-4 border-[#E8452A] border-t-transparent rounded-full" />
       </div>
     )
+  }
+
+  const COLUMN_STYLE: Record<string, { header: string; label: string; badge: string }> = {
+    URGENT:    { header: 'bg-[#FEE9E5]', label: 'text-[#C23B2A] font-bold', badge: 'bg-[#C23B2A] text-white' },
+    IMPORTANT: { header: 'bg-[#FFF3E5]', label: 'text-[#B05A10] font-bold', badge: 'bg-[#B05A10] text-white' },
+    NORMAL:    { header: 'bg-[#E8F0FF]', label: 'text-[#2850A8] font-bold', badge: 'bg-[#2850A8] text-white' },
+    FAIBLE:    { header: 'bg-[#F0F0F0]', label: 'text-[#666] font-bold',    badge: 'bg-[#999] text-white' },
   }
 
   return (
@@ -138,28 +145,21 @@ export default function Dashboard() {
       <div className="flex gap-4 flex-1">
         {COLUMNS.map(classification => {
           const conf         = CLASSIFICATION_CONFIG[classification]
+          const colStyle     = COLUMN_STYLE[classification]
           const columnEmails = emails.filter(e => e.classification === classification)
 
           return (
             <div key={classification} className="flex-1 flex flex-col min-w-0">
-              <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl mb-3 bg-white border border-gray-100 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${
-                    classification === 'URGENT'    ? 'bg-red-500' :
-                    classification === 'IMPORTANT' ? 'bg-orange-400' :
-                    classification === 'NORMAL'    ? 'bg-blue-400' :
-                    'bg-gray-400'
-                  }`} />
-                  <span className="font-semibold text-sm text-gray-800">{conf.label}</span>
-                </div>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${conf.badge}`}>
+              <div className={`flex items-center justify-between px-3 py-2.5 rounded-2xl mb-3 ${colStyle.header}`}>
+                <span className={`text-xs uppercase tracking-wider ${colStyle.label}`}>{conf.label}</span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colStyle.badge}`}>
                   {countForColumn(classification)}
                 </span>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                 {columnEmails.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400 text-sm">
+                  <div className="text-center py-8 text-[#bbb] text-sm">
                     Aucun email en attente
                   </div>
                 ) : (
@@ -180,7 +180,7 @@ export default function Dashboard() {
       {/* ── Modal email (Portal sur document.body pour éviter tout problème CSS) ── */}
       {selectedEmail && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) handleClose() }}
         >
           <div className="w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl">
@@ -198,18 +198,18 @@ export default function Dashboard() {
       )}
 
       {/* ── Barre du bas ── */}
-      <div className="fixed bottom-4 right-6 text-xs text-gray-400 flex items-center gap-3">
+      <div className="fixed bottom-4 right-6 text-xs text-[#aaa] flex items-center gap-3">
 
         {/* Résultat / progression */}
         {polling && pollProgress ? (
-          <span className="text-gray-500 font-medium">
+          <span className="text-[#555] font-medium">
             Traitement {pollProgress.done} / {pollProgress.total}...
           </span>
         ) : pollResult ? (
-          <span className={`px-2.5 py-1 rounded-full font-medium ${
+          <span className={`px-2.5 py-1 rounded-full font-semibold ${
             pollResult.startsWith('Erreur') || pollResult.startsWith('Réseau')
-              ? 'bg-red-50 text-red-600'
-              : 'bg-gray-100 text-gray-700'
+              ? 'bg-[#FEE9E5] text-[#C23B2A]'
+              : 'bg-[#EDE8E0] text-[#555]'
           }`}>
             {pollResult}
           </span>
@@ -217,7 +217,7 @@ export default function Dashboard() {
 
         {/* Badge mails non lus */}
         {unreadCount !== null && unreadCount > 0 && (
-          <span className="bg-black text-white font-semibold px-2.5 py-0.5 rounded-full">
+          <span className="bg-[#E8452A] text-white font-bold px-2.5 py-0.5 rounded-full">
             {unreadCount} non lu{unreadCount > 1 ? 's' : ''}
           </span>
         )}
@@ -225,14 +225,14 @@ export default function Dashboard() {
         <button
           onClick={handlePoll}
           disabled={polling}
-          className="hover:text-black transition-colors underline underline-offset-2 disabled:opacity-40"
+          className="hover:text-[#E8452A] transition-colors underline underline-offset-2 disabled:opacity-40"
         >
           {polling ? 'Polling...' : 'Lancer le polling'}
         </button>
-        <span>·</span>
+        <span className="text-[#D8D0C5]">·</span>
         <button
           onClick={fetchEmails}
-          className="hover:text-black transition-colors underline underline-offset-2"
+          className="hover:text-[#E8452A] transition-colors underline underline-offset-2"
         >
           {refreshed ? 'Actualisé ✓' : 'Actualiser'}
         </button>
