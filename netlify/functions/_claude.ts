@@ -17,6 +17,7 @@ export async function classifyAndDraftEmail(opts: {
   fromName: string;
   subject: string;
   body: string;
+  context?: string;
 }): Promise<ClaudeEmailResult> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -65,7 +66,7 @@ Réponds UNIQUEMENT en JSON valide, sans markdown autour, avec exactement cette 
 
 **Corps du message :**
 ${opts.body}
-
+${opts.context ? `\n---\n**Instructions spécifiques de l'équipe pour cette réponse :**\n${opts.context}\n---\n` : ''}
 Classifie cet email et rédige un brouillon de réponse approprié.`;
 
   const response = await client.messages.create({

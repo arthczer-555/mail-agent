@@ -189,7 +189,6 @@ export default function Dashboard() {
                 email={selectedEmail}
                 onClose={handleClose}
                 onAction={handleAction}
-                onRefresh={fetchEmails}
               />
             </ModalErrorBoundary>
           </div>
