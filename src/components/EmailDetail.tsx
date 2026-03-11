@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Email, CLASSIFICATION_CONFIG } from '../types'
 
 interface Props {
   email: Email
   onClose: () => void
   onAction: () => void
+  onRefresh?: () => Promise<void>
 }
 
 function formatSize(bytes: number): string {
@@ -13,16 +14,18 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
 }
 
-export default function EmailDetail({ email, onClose, onAction }: Props) {
+export default function EmailDetail({ email, onClose, onAction, onRefresh }: Props) {
   const [response, setResponse]   = useState(email.draft_response ?? '')
   const [loading, setLoading]     = useState(false)
   const [mode, setMode]           = useState<'view' | 'edit'>('view')
   const [feedback, setFeedback]   = useState<string | null>(null)
 
   // ── Context panel ──
-  const [contextText, setContextText]       = useState('')
-  const [showContext, setShowContext]       = useState(false)
-  const [redraftLoading, setRedraftLoading] = useState(false)
+  const [contextText, setContextText]           = useState('')
+  const [showContext, setShowContext]           = useState(false)
+  const [redraftLoading, setRedraftLoading]     = useState(false)
+  const [waitingForRedraft, setWaitingForRedraft] = useState(false)
+  const originalDraftRef = useRef('')
 
   const conf        = CLASSIFICATION_CONFIG[email.classification] ?? CLASSIFICATION_CONFIG['NORMAL']
   const body        = email.body_text || email.body_preview || '(corps vide)'
@@ -32,24 +35,46 @@ export default function EmailDetail({ email, onClose, onAction }: Props) {
   const handleRedraft = async () => {
     if (!contextText.trim()) return
     setRedraftLoading(true)
+    setWaitingForRedraft(true)
+    originalDraftRef.current = response
     try {
-      const res  = await fetch(`/api/emails/${email.id}/redraft`, {
+      await fetch('/api/redraft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: contextText }),
+        body: JSON.stringify({ emailId: email.id, context: contextText }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Erreur')
-      setResponse(data.draft)
+      // 202 reçu — le résultat arrivera via polling
+    } catch {
+      setFeedback('Erreur réseau')
+      setRedraftLoading(false)
+      setWaitingForRedraft(false)
+    }
+  }
+
+  // Poll toutes les 3s tant qu'on attend le redraft
+  useEffect(() => {
+    if (!waitingForRedraft) return
+    const interval = setInterval(() => { onRefresh?.() }, 3000)
+    const timeout  = setTimeout(() => {
+      setWaitingForRedraft(false)
+      setRedraftLoading(false)
+      setFeedback('Délai dépassé, réessaie')
+    }, 90000)
+    return () => { clearInterval(interval); clearTimeout(timeout) }
+  }, [waitingForRedraft, onRefresh])
+
+  // Détecter quand draft_response change dans la DB
+  useEffect(() => {
+    if (!waitingForRedraft) return
+    if (email.draft_response && email.draft_response !== originalDraftRef.current) {
+      setResponse(email.draft_response)
+      setWaitingForRedraft(false)
+      setRedraftLoading(false)
       setShowContext(false)
       setContextText('')
       setFeedback('Brouillon régénéré ✓')
-    } catch (err: unknown) {
-      setFeedback(`Erreur : ${err instanceof Error ? err.message : 'inconnue'}`)
-    } finally {
-      setRedraftLoading(false)
     }
-  }
+  }, [email.draft_response, waitingForRedraft])
 
   const sendAction = async (action: 'validate' | 'reject' | 'draft' | 'report') => {
     setLoading(true)

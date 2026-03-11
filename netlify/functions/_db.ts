@@ -3,10 +3,16 @@
 // ============================================================
 import postgres from 'postgres';
 
+// Singleton — réutilise la même pool sur les invocations warm (évite le cold start DB à chaque requête)
+let _db: ReturnType<typeof postgres> | null = null;
+
 export function getDb() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL manquant dans les variables d\'environnement');
-  return postgres(url, { ssl: 'require', max: 1, connect_timeout: 10, idle_timeout: 20 });
+  if (!_db) {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error('DATABASE_URL manquant dans les variables d\'environnement');
+    _db = postgres(url, { ssl: 'require', max: 2, connect_timeout: 10, idle_timeout: 60 });
+  }
+  return _db;
 }
 
 export type EmailStatus = 'pending' | 'locked' | 'validated' | 'rejected' | 'sent' | 'draft_saved';

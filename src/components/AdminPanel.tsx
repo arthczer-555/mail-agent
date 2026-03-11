@@ -51,6 +51,13 @@ function GuideAndExamplesTab() {
   const [exSaving, setExSaving]   = useState(false)
   const [exFeedback, setExFeedback] = useState<string | null>(null)
 
+  const [editingId, setEditingId]   = useState<string | null>(null)
+  const [editForm, setEditForm]     = useState({
+    email_subject: '', email_from: '', email_body: '',
+    ideal_response: '', classification: 'NORMAL' as Classification, notes: '',
+  })
+  const [editSaving, setEditSaving] = useState(false)
+
   // ── Chargement ──
   useEffect(() => {
     fetch('/api/guide')
@@ -148,6 +155,42 @@ function GuideAndExamplesTab() {
   const handleDeleteExample = async (id: string) => {
     await fetch(`/api/examples?id=${id}`, { method: 'DELETE' })
     loadExamples()
+  }
+
+  // ── Exemples : commencer à éditer ──
+  const handleStartEdit = (ex: Example) => {
+    setEditingId(ex.id)
+    setEditForm({
+      email_subject:  ex.email_subject  ?? '',
+      email_from:     ex.email_from     ?? '',
+      email_body:     (ex as any).email_body     ?? ex.email_body_preview ?? '',
+      ideal_response: (ex as any).ideal_response ?? ex.ideal_response_preview ?? '',
+      classification: ex.classification,
+      notes:          ex.notes          ?? '',
+    })
+  }
+
+  // ── Exemples : sauvegarder l'édition ──
+  const handleSaveEdit = async () => {
+    if (!editingId) return
+    if (!editForm.email_body || !editForm.ideal_response) {
+      setExFeedback('Email et réponse idéale sont requis')
+      return
+    }
+    setEditSaving(true)
+    const res = await fetch(`/api/examples?id=${editingId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm),
+    })
+    if (res.ok) {
+      setEditingId(null)
+      setExFeedback('Exemple mis à jour ✓')
+      loadExamples()
+    } else {
+      setExFeedback('Erreur lors de la mise à jour')
+    }
+    setEditSaving(false)
   }
 
   return (
@@ -325,6 +368,11 @@ function GuideAndExamplesTab() {
         )}
 
         {/* Liste des exemples */}
+        {exFeedback && (
+          <div className="px-6 pt-3">
+            <span className="text-sm text-green-700 bg-green-50 px-3 py-1.5 rounded-lg">{exFeedback}</span>
+          </div>
+        )}
         {examples.length === 0 ? (
           <div className="px-6 py-10 text-center text-sm text-gray-400">
             Aucun exemple — ajoutez des emails représentatifs pour améliorer les réponses de Claude.
@@ -333,23 +381,108 @@ function GuideAndExamplesTab() {
           <div className="divide-y divide-gray-100">
             {examples.map(ex => {
               const conf = CLASSIFICATION_CONFIG[ex.classification]
+              const isEditing = editingId === ex.id
               return (
-                <div key={ex.id} className="flex items-start gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5 ${conf.badge}`}>
-                    {conf.label}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    {ex.email_subject && (
-                      <p className="text-sm font-medium text-gray-800 truncate">{ex.email_subject}</p>
-                    )}
-                    <p className="text-xs text-gray-500 truncate mt-0.5">{ex.email_body_preview}</p>
+                <div key={ex.id}>
+                  {/* Ligne résumé */}
+                  <div className="flex items-start gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5 ${conf.badge}`}>
+                      {conf.label}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      {ex.email_subject && (
+                        <p className="text-sm font-medium text-gray-800 truncate">{ex.email_subject}</p>
+                      )}
+                      <p className="text-xs text-gray-500 truncate mt-0.5">{ex.email_body_preview}</p>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <button
+                        onClick={() => isEditing ? setEditingId(null) : handleStartEdit(ex)}
+                        className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
+                      >
+                        {isEditing ? 'Annuler' : 'Modifier'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteExample(ex.id)}
+                        className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => handleDeleteExample(ex.id)}
-                    className="text-xs text-red-400 hover:text-red-600 flex-shrink-0 transition-colors"
-                  >
-                    Supprimer
-                  </button>
+
+                  {/* Formulaire d'édition inline */}
+                  {isEditing && (
+                    <div className="px-6 pb-6 bg-indigo-50 border-t border-indigo-100 space-y-4 pt-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Objet de l'email</label>
+                          <input
+                            value={editForm.email_subject}
+                            onChange={e => setEditForm(f => ({ ...f, email_subject: e.target.value }))}
+                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Expéditeur</label>
+                          <input
+                            value={editForm.email_from}
+                            onChange={e => setEditForm(f => ({ ...f, email_from: e.target.value }))}
+                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Email reçu *</label>
+                          <textarea
+                            value={editForm.email_body}
+                            onChange={e => setEditForm(f => ({ ...f, email_body: e.target.value }))}
+                            rows={6}
+                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Réponse idéale *</label>
+                          <textarea
+                            value={editForm.ideal_response}
+                            onChange={e => setEditForm(f => ({ ...f, ideal_response: e.target.value }))}
+                            rows={6}
+                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-end gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Classification</label>
+                          <select
+                            value={editForm.classification}
+                            onChange={e => setEditForm(f => ({ ...f, classification: e.target.value as Classification }))}
+                            className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                          >
+                            {CLASSIFICATIONS.map(c => (
+                              <option key={c} value={c}>{CLASSIFICATION_CONFIG[c].label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                          <input
+                            value={editForm.notes}
+                            onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                          />
+                        </div>
+                        <button
+                          onClick={handleSaveEdit}
+                          disabled={editSaving}
+                          className="btn-primary text-sm"
+                        >
+                          {editSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}

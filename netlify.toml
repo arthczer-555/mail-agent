@@ -21,6 +21,11 @@
   status = 200
 
 [[redirects]]
+  from   = "/api/redraft"
+  to     = "/.netlify/functions/email-redraft-background"
+  status = 200
+
+[[redirects]]
   from   = "/api/emails"
   to     = "/.netlify/functions/get-emails"
   status = 200

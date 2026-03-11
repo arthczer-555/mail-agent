@@ -16,8 +16,10 @@ export default async function handler(req: Request) {
   if (req.method === 'GET') {
     try {
       const examples = await db`
-        SELECT id, email_subject, email_from, LEFT(email_body, 300) AS email_body_preview,
+        SELECT id, email_subject, email_from,
+               LEFT(email_body, 300) AS email_body_preview,
                LEFT(ideal_response, 300) AS ideal_response_preview,
+               email_body, ideal_response,
                classification, notes, created_at
         FROM examples
         ORDER BY created_at DESC
@@ -54,6 +56,35 @@ export default async function handler(req: Request) {
       return jsonResponse({ success: true, id: row.id, created_at: row.created_at });
     } catch (err) {
       console.error('[manage-examples] POST Erreur:', err);
+      return errorResponse('Erreur serveur', 500);
+    }
+  }
+
+  // ── PUT : modifier un exemple ──
+  if (req.method === 'PUT') {
+    try {
+      const id = url.searchParams.get('id');
+      if (!id) return errorResponse('Paramètre "id" requis', 400);
+
+      const body = await req.json();
+      const { email_subject, email_from, email_body, ideal_response, classification, notes } = body;
+
+      if (!email_body || !ideal_response) {
+        return errorResponse('email_body et ideal_response sont requis', 400);
+      }
+
+      await db`
+        UPDATE examples
+        SET email_subject  = ${email_subject ?? ''},
+            email_from     = ${email_from ?? ''},
+            email_body     = ${email_body},
+            ideal_response = ${ideal_response},
+            classification = ${classification ?? 'NORMAL'},
+            notes          = ${notes ?? ''}
+        WHERE id = ${id}
+      `;
+      return jsonResponse({ success: true });
+    } catch (err) {
       return errorResponse('Erreur serveur', 500);
     }
   }

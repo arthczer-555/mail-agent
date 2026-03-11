@@ -1,33 +1,34 @@
 // ============================================================
 // Background Function — Régénération brouillon avec contexte
-// Retourne 202 immédiatement, traitement jusqu'à 15 minutes
+// Filename -background → Netlify retourne 202 immédiatement,
+// ce handler tourne en async jusqu'à 15 minutes (pas de timeout HTTP)
 // ============================================================
-import type { Config } from '@netlify/functions';
 import { getDb } from './_db.js';
-import { redraftWithContext } from './_claude.js';
+import { classifyAndDraftEmail } from './_claude.js';
 
-export default async function handler(req: Request) {
-  const parts   = new URL(req.url).pathname.split('/').filter(Boolean);
-  const emailId = parts[2]; // /api/redraft/:id
-  if (!emailId) return new Response(null, { status: 202 });
+// PAS de Config.path — le routing est géré par netlify.toml
+// Le emailId est lu depuis le body de la requête
 
-  const { context } = await req.json().catch(() => ({})) as { context?: string };
-  if (!context) return new Response(null, { status: 202 });
+export default async function handler(req: Request): Promise<void> {
+  const { emailId, context } = await req.json().catch(() => ({})) as { emailId?: string; context?: string };
+  if (!emailId || !context?.trim()) return;
 
   const db = getDb();
 
-  const [emailRows, guideRows, exampleRows] = await Promise.all([
+  const [emailRows, guideRows, exampleRows, ruleRows] = await Promise.all([
     db`SELECT * FROM emails WHERE id = ${emailId}`,
     db`SELECT content FROM guide ORDER BY updated_at DESC LIMIT 1`.catch(() => []),
-    db`SELECT email_body, ideal_response, classification FROM examples ORDER BY created_at DESC LIMIT 5`.catch(() => []),
+    db`SELECT email_body, ideal_response, classification FROM examples ORDER BY created_at DESC LIMIT 8`.catch(() => []),
+    db`SELECT rule_type, value, classification FROM rules`.catch(() => []),
   ]);
 
   const email = (emailRows as any[])[0];
-  if (!email) return new Response(null, { status: 202 });
+  if (!email) return;
 
-  const newDraft = await redraftWithContext({
+  const result = await classifyAndDraftEmail({
     guide:     (guideRows[0] as any)?.content ?? '',
     examples:  exampleRows as any[],
+    rules:     ruleRows as any[],
     fromEmail: email.from_email,
     fromName:  email.from_name,
     subject:   email.subject,
@@ -35,9 +36,6 @@ export default async function handler(req: Request) {
     context,
   });
 
-  await db`UPDATE emails SET draft_response = ${newDraft} WHERE id = ${emailId}`;
-  console.log(`[redraft-bg] ✓ Email ${emailId} brouillon régénéré`);
-  return new Response(null, { status: 202 });
+  await db`UPDATE emails SET draft_response = ${result.draft_response} WHERE id = ${emailId}`;
+  console.log(`[redraft-bg] ✓ ${emailId} brouillon régénéré`);
 }
-
-export const config: Config = { path: '/api/redraft/:id' };
