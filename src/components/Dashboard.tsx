@@ -151,7 +151,7 @@ export default function Dashboard() {
           return (
             <div key={classification} className="flex-1 flex flex-col min-w-0">
               <div className={`flex items-center justify-between px-3 py-2.5 rounded-2xl mb-3 ${colStyle.header}`}>
-                <span className={`text-xs uppercase tracking-wider ${colStyle.label}`}>{conf.label}</span>
+                <span className={`text-xs uppercase tracking-wider whitespace-nowrap ${colStyle.label}`}>{conf.label}</span>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colStyle.badge}`}>
                   {countForColumn(classification)}
                 </span>

@@ -323,43 +323,40 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
       </div>
 
       {/* ── Barre d'actions ── */}
-      <div className="px-5 py-3 bg-white border-t border-[#F0EDE8] flex items-center justify-between gap-3 flex-shrink-0">
-        <p className="text-xs text-[#bbb]">
-          "Brouillon Gmail" pour réviser dans Gmail · "Envoyer & Enregistrer" pour sauvegarder dans le guide
-        </p>
-
-        <div className="flex items-center gap-2">
-          {feedback ? (
-            <span className="text-sm font-semibold text-[#555] bg-[#EDE8E0] px-3 py-1.5 rounded-full">
+      <div className="px-5 py-3 bg-white border-t border-[#F0EDE8] flex-shrink-0">
+        {feedback ? (
+          <div className="flex justify-center">
+            <span className="text-sm font-semibold text-[#555] bg-[#EDE8E0] px-4 py-2 rounded-full">
               {feedback}
             </span>
-          ) : (
-            <>
+          </div>
+        ) : (
+          <div className="flex gap-2">
               <button
                 onClick={() => sendAction('report')}
                 disabled={loading}
-                className="btn-danger text-sm"
+                className="flex-1 btn-danger text-sm"
               >
                 Signaler
               </button>
               <button
                 onClick={() => sendAction('reject')}
                 disabled={loading}
-                className="btn-ghost text-sm"
+                className="flex-1 btn-ghost text-sm"
               >
                 Mark as read
               </button>
               <button
                 onClick={() => sendAction('draft')}
                 disabled={loading || !response.trim()}
-                className="btn-ghost text-sm"
+                className="flex-1 btn-ghost text-sm"
               >
                 {loading ? '...' : 'Brouillon Gmail'}
               </button>
               <button
                 onClick={() => sendAction('validate')}
                 disabled={loading || !response.trim()}
-                className="btn-success text-sm"
+                className="flex-1 btn-success text-sm"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -373,7 +370,7 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
               <button
                 onClick={sendAndSave}
                 disabled={loading || !response.trim()}
-                className="text-sm px-4 py-2 rounded-xl font-semibold bg-[#F768A8] hover:bg-[#F0024F] text-white transition-colors disabled:opacity-40"
+                className="flex-1 text-sm px-4 py-2 rounded-xl font-semibold bg-[#F768A8] hover:bg-[#F0024F] text-white transition-colors disabled:opacity-40"
                 title="Envoyer l'email et enregistrer cet échange dans le guide des réponses"
               >
                 {loading ? (
@@ -385,9 +382,8 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
                   'Envoyer & Enregistrer'
                 )}
               </button>
-            </>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )
