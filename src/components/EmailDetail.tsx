@@ -73,6 +73,7 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
       setShowContext(false)
       setContextText('')
       setFeedback('Brouillon régénéré ✓')
+      setTimeout(() => setFeedback(null), 3000)
     }
   }, [email.draft_response, waitingForRedraft])
 
@@ -102,6 +103,41 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
         setFeedback('Email marqué comme lu')
         setTimeout(onAction, 800)
       }
+    } catch (err: unknown) {
+      setFeedback(`Erreur : ${err instanceof Error ? err.message : 'inconnue'}`)
+      setLoading(false)
+    }
+  }
+
+  const sendAndSave = async () => {
+    setLoading(true)
+    setFeedback(null)
+    try {
+      // 1. Envoyer l'email
+      const res = await fetch(`/api/emails/${email.id}/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: 'team', final_response: response }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Erreur lors de l\'envoi')
+
+      // 2. Enregistrer dans le guide des réponses
+      await fetch('/api/examples', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email_subject:   email.subject,
+          email_from:      email.from_email,
+          email_body:      email.body_text || email.body_preview || '',
+          ideal_response:  response,
+          classification:  email.classification,
+          notes:           '',
+        }),
+      })
+
+      setFeedback('Réponse envoyée & exemple enregistré ✓')
+      setTimeout(onAction, 1500)
     } catch (err: unknown) {
       setFeedback(`Erreur : ${err instanceof Error ? err.message : 'inconnue'}`)
       setLoading(false)
@@ -288,7 +324,7 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
       {/* ── Barre d'actions ── */}
       <div className="px-5 py-3 bg-white border-t border-[#F0EDE8] flex items-center justify-between gap-3 flex-shrink-0">
         <p className="text-xs text-[#bbb]">
-          "Brouillon Gmail" pour réviser dans Gmail · "Envoyer" pour envoyer directement
+          "Brouillon Gmail" pour réviser dans Gmail · "Envoyer & Enregistrer" pour sauvegarder dans le guide
         </p>
 
         <div className="flex items-center gap-2">
@@ -331,6 +367,21 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
                   </span>
                 ) : (
                   'Envoyer'
+                )}
+              </button>
+              <button
+                onClick={sendAndSave}
+                disabled={loading || !response.trim()}
+                className="text-sm px-4 py-2 rounded-xl font-semibold bg-[#F768A8] hover:bg-[#F0024F] text-white transition-colors disabled:opacity-40"
+                title="Envoyer l'email et enregistrer cet échange dans le guide des réponses"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    Envoi...
+                  </span>
+                ) : (
+                  'Envoyer & Enregistrer'
                 )}
               </button>
             </>
