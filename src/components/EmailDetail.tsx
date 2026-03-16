@@ -123,18 +123,19 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
       if (!res.ok) throw new Error(data.error ?? 'Erreur lors de l\'envoi')
 
       // 2. Enregistrer dans le guide des réponses
-      await fetch('/api/examples', {
+      const saveRes = await fetch('/api/examples', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email_subject:   email.subject,
           email_from:      email.from_email,
-          email_body:      email.body_text || email.body_preview || '',
+          email_body:      email.body_text || email.body_preview || '(corps non disponible)',
           ideal_response:  response,
           classification:  email.classification,
           notes:           '',
         }),
       })
+      if (!saveRes.ok) throw new Error('Envoyé, mais erreur lors de la sauvegarde dans le guide')
 
       setFeedback('Réponse envoyée & exemple enregistré ✓')
       setTimeout(onAction, 1500)

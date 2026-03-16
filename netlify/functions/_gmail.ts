@@ -85,6 +85,7 @@ export function buildRawEmail(opts: {
   from: string;
   subject: string;
   body: string;
+  cc?: string;
   threadId?: string;
   inReplyTo?: string;
 }): string {
@@ -95,6 +96,10 @@ export function buildRawEmail(opts: {
     'Content-Type: text/plain; charset=utf-8',
     'MIME-Version: 1.0',
   ];
+
+  if (opts.cc) {
+    lines.push(`Cc: ${opts.cc}`);
+  }
 
   if (opts.inReplyTo) {
     lines.push(`In-Reply-To: ${opts.inReplyTo}`);

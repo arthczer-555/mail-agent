@@ -25,6 +25,7 @@ export interface EmailRow {
   from_email: string;
   from_name: string;
   to_email: string;
+  cc_emails: string;
   subject: string;
   body_text: string;
   received_at: string;

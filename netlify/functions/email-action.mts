@@ -116,13 +116,19 @@ export default async function handler(req: Request) {
       if (!responseText) return errorResponse('Aucun texte de réponse fourni', 400);
 
       const gmail       = getGmailClient();
-      const senderEmail = process.env.GMAIL_ADDRESS ?? 'contact@coachello.io';
+      const senderEmail = (process.env.GMAIL_ADDRESS ?? 'contact@coachello.io').toLowerCase();
+
+      // Reply All : CC = destinataires originaux (To + Cc) sauf notre propre adresse
+      const originalTo = (email.to_email ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && s.toLowerCase() !== senderEmail);
+      const originalCc = (email.cc_emails ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
+      const ccList     = [...originalTo, ...originalCc].join(', ') || undefined;
 
       const raw = buildRawEmail({
         to:       email.from_email,
         from:     senderEmail,
         subject:  email.subject,
         body:     responseText,
+        cc:       ccList,
         threadId: email.thread_id,
       });
 
@@ -177,13 +183,18 @@ export default async function handler(req: Request) {
       if (!responseText) return errorResponse('Aucun texte de réponse fourni', 400);
 
       const gmail       = getGmailClient();
-      const senderEmail = process.env.GMAIL_ADDRESS ?? 'contact@coachello.io';
+      const senderEmail = (process.env.GMAIL_ADDRESS ?? 'contact@coachello.io').toLowerCase();
+
+      const originalTo = (email.to_email ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && s.toLowerCase() !== senderEmail);
+      const originalCc = (email.cc_emails ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
+      const ccList     = [...originalTo, ...originalCc].join(', ') || undefined;
 
       const raw = buildRawEmail({
         to:       email.from_email,
         from:     senderEmail,
         subject:  email.subject,
         body:     responseText,
+        cc:       ccList,
         threadId: email.thread_id,
       });
 
