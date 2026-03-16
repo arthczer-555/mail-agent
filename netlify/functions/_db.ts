@@ -22,6 +22,7 @@ export interface EmailRow {
   id: string;
   gmail_id: string;
   thread_id: string;
+  message_id: string;
   from_email: string;
   from_name: string;
   to_email: string;

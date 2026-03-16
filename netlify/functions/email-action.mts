@@ -124,12 +124,13 @@ export default async function handler(req: Request) {
       const ccList     = [...originalTo, ...originalCc].join(', ') || undefined;
 
       const raw = buildRawEmail({
-        to:       email.from_email,
-        from:     senderEmail,
-        subject:  email.subject,
-        body:     responseText,
-        cc:       ccList,
-        threadId: email.thread_id,
+        to:         email.from_email,
+        from:       senderEmail,
+        subject:    email.subject,
+        body:       responseText,
+        cc:         ccList,
+        threadId:   email.thread_id,
+        inReplyTo:  email.message_id || undefined,
       });
 
       // URGENT et IMPORTANT → brouillon (validation humaine finale dans Gmail)
@@ -190,12 +191,13 @@ export default async function handler(req: Request) {
       const ccList     = [...originalTo, ...originalCc].join(', ') || undefined;
 
       const raw = buildRawEmail({
-        to:       email.from_email,
-        from:     senderEmail,
-        subject:  email.subject,
-        body:     responseText,
-        cc:       ccList,
-        threadId: email.thread_id,
+        to:        email.from_email,
+        from:      senderEmail,
+        subject:   email.subject,
+        body:      responseText,
+        cc:        ccList,
+        threadId:  email.thread_id,
+        inReplyTo: email.message_id || undefined,
       });
 
       await gmail.users.drafts.create({
