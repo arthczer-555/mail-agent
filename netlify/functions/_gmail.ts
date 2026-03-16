@@ -79,6 +79,12 @@ export function extractAttachments(payload: any): GmailAttachment[] {
   return attachments;
 }
 
+// Encoder un header RFC 2047 si le sujet contient des caractères non-ASCII
+function encodeSubject(value: string): string {
+  if (/^[\x00-\x7F]*$/.test(value)) return value;
+  return `=?UTF-8?B?${Buffer.from(value, 'utf8').toString('base64')}?=`;
+}
+
 // Construire un email brut RFC 2822 encodé en base64url (pour envoi/brouillon)
 export function buildRawEmail(opts: {
   to: string;
@@ -89,10 +95,11 @@ export function buildRawEmail(opts: {
   threadId?: string;
   inReplyTo?: string;
 }): string {
+  const subjectLine = `Re: ${opts.subject}`;
   const lines = [
     `To: ${opts.to}`,
     `From: ${opts.from}`,
-    `Subject: Re: ${opts.subject}`,
+    `Subject: ${encodeSubject(subjectLine)}`,
     'Content-Type: text/plain; charset=utf-8',
     'MIME-Version: 1.0',
   ];
