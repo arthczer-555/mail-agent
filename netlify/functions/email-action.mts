@@ -118,6 +118,18 @@ export default async function handler(req: Request) {
       const gmail       = getGmailClient();
       const senderEmail = (process.env.GMAIL_ADDRESS ?? 'contact@coachello.io').toLowerCase();
 
+      // Récupérer le Message-ID de l'email original depuis Gmail (pour In-Reply-To)
+      let inReplyTo: string | undefined = email.message_id || undefined;
+      if (!inReplyTo && email.gmail_id) {
+        try {
+          const orig = await gmail.users.messages.get({
+            userId: 'me', id: email.gmail_id, format: 'metadata',
+            metadataHeaders: ['Message-ID'],
+          });
+          inReplyTo = orig.data.payload?.headers?.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value || undefined;
+        } catch { /* silencieux */ }
+      }
+
       // Reply All : CC = destinataires originaux (To + Cc) sauf notre propre adresse
       const originalTo = (email.to_email ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && s.toLowerCase() !== senderEmail);
       const originalCc = (email.cc_emails ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
@@ -130,7 +142,7 @@ export default async function handler(req: Request) {
         body:       responseText,
         cc:         ccList,
         threadId:   email.thread_id,
-        inReplyTo:  email.message_id || undefined,
+        inReplyTo,
       });
 
       // URGENT et IMPORTANT → brouillon (validation humaine finale dans Gmail)
@@ -186,6 +198,17 @@ export default async function handler(req: Request) {
       const gmail       = getGmailClient();
       const senderEmail = (process.env.GMAIL_ADDRESS ?? 'contact@coachello.io').toLowerCase();
 
+      let inReplyTo: string | undefined = email.message_id || undefined;
+      if (!inReplyTo && email.gmail_id) {
+        try {
+          const orig = await gmail.users.messages.get({
+            userId: 'me', id: email.gmail_id, format: 'metadata',
+            metadataHeaders: ['Message-ID'],
+          });
+          inReplyTo = orig.data.payload?.headers?.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value || undefined;
+        } catch { /* silencieux */ }
+      }
+
       const originalTo = (email.to_email ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && s.toLowerCase() !== senderEmail);
       const originalCc = (email.cc_emails ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
       const ccList     = [...originalTo, ...originalCc].join(', ') || undefined;
@@ -197,7 +220,7 @@ export default async function handler(req: Request) {
         body:      responseText,
         cc:        ccList,
         threadId:  email.thread_id,
-        inReplyTo: email.message_id || undefined,
+        inReplyTo,
       });
 
       await gmail.users.drafts.create({
