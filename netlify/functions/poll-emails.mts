@@ -127,7 +127,7 @@ export default async function handler(req: Request) {
               classification, reasoning, draft_response, status, attachments
             ) VALUES (
               ${gmailId ?? ''}, ${threadId ?? ''}, ${messageId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw ?? ''}, ${ccRaw ?? ''},
-              ${subject}, ${bodyText ?? ''}, ${bodyHtml ?? ''}, ${receivedAt},
+              ${subject}, ${effectiveBody ?? ''}, ${bodyHtml ?? ''}, ${receivedAt},
               ${result.classification}, ${result.reasoning}, ${result.draft_response}, 'pending',
               ${JSON.stringify(attachments)}::jsonb
             )
@@ -141,7 +141,7 @@ export default async function handler(req: Request) {
               classification, reasoning, draft_response, status
             ) VALUES (
               ${gmailId ?? ''}, ${threadId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw ?? ''},
-              ${subject}, ${bodyText ?? ''}, ${bodyHtml ?? ''}, ${receivedAt},
+              ${subject}, ${effectiveBody ?? ''}, ${bodyHtml ?? ''}, ${receivedAt},
               ${result.classification}, ${result.reasoning}, ${result.draft_response}, 'pending'
             )
             ON CONFLICT (gmail_id) DO NOTHING

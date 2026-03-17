@@ -7,6 +7,12 @@ import { getDb, corsHeaders, jsonResponse, errorResponse } from './_db.js';
 import { getGmailClient, buildRawEmail } from './_gmail.js';
 import { askClarifyingQuestions } from './_claude.js';
 
+// Extraire l'adresse email d'une entrée "Nom <email>" ou "email"
+function extractEmail(addr: string): string {
+  const match = addr.match(/<([^>]+)>/);
+  return (match ? match[1] : addr).toLowerCase().trim();
+}
+
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
@@ -131,8 +137,8 @@ export default async function handler(req: Request) {
       }
 
       // Reply All : CC = destinataires originaux (To + Cc) sauf notre propre adresse
-      const originalTo = (email.to_email ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && s.toLowerCase() !== senderEmail);
-      const originalCc = (email.cc_emails ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
+      const originalTo = (email.to_email ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && extractEmail(s) !== senderEmail);
+      const originalCc = (email.cc_emails ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && extractEmail(s) !== senderEmail);
       const ccList     = [...originalTo, ...originalCc].join(', ') || undefined;
 
       const raw = buildRawEmail({
@@ -209,8 +215,8 @@ export default async function handler(req: Request) {
         } catch { /* silencieux */ }
       }
 
-      const originalTo = (email.to_email ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && s.toLowerCase() !== senderEmail);
-      const originalCc = (email.cc_emails ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
+      const originalTo = (email.to_email ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && extractEmail(s) !== senderEmail);
+      const originalCc = (email.cc_emails ?? '').split(',').map((s: string) => s.trim()).filter((s: string) => s && extractEmail(s) !== senderEmail);
       const ccList     = [...originalTo, ...originalCc].join(', ') || undefined;
 
       const raw = buildRawEmail({
