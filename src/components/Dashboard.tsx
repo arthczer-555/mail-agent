@@ -38,6 +38,7 @@ export default function Dashboard() {
   const [refreshed, setRefreshed]     = useState(false)
   const [pollProgress, setPollProgress] = useState<{ done: number; total: number } | null>(null)
   const [unreadCount, setUnreadCount] = useState<number | null>(null)
+  const [markingAllRead, setMarkingAllRead] = useState(false)
 
   const fetchEmails = useCallback(async () => {
     try {
@@ -122,6 +123,21 @@ export default function Dashboard() {
   const countForColumn = (classification: Classification) =>
     emails.filter(e => e.classification === classification).length
 
+  const handleMarkAllRead = async (classification: Classification) => {
+    setMarkingAllRead(true)
+    try {
+      await fetch('/api/bulk-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark-read', classification }),
+      })
+      fetchEmails()
+    } catch {
+      // silencieux
+    }
+    setMarkingAllRead(false)
+  }
+
 
   if (loading) {
     return (
@@ -152,9 +168,21 @@ export default function Dashboard() {
             <div key={classification} className="flex-1 flex flex-col min-w-0">
               <div className={`flex items-center justify-between px-3 py-2.5 rounded-2xl mb-3 ${colStyle.header}`}>
                 <span className={`text-xs uppercase tracking-wider whitespace-nowrap ${colStyle.label}`}>{conf.label}</span>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colStyle.badge}`}>
-                  {countForColumn(classification)}
-                </span>
+                <div className="flex items-center gap-2">
+                  {classification === 'FAIBLE' && countForColumn('FAIBLE') > 0 && (
+                    <button
+                      onClick={() => handleMarkAllRead('FAIBLE')}
+                      disabled={markingAllRead}
+                      title="Tout marquer comme lu"
+                      className="text-[10px] font-semibold text-[#C8A0BE] bg-white/50 hover:bg-white/80 px-2 py-0.5 rounded-full transition-colors disabled:opacity-40 whitespace-nowrap"
+                    >
+                      {markingAllRead ? '...' : 'Tout lire'}
+                    </button>
+                  )}
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colStyle.badge}`}>
+                    {countForColumn(classification)}
+                  </span>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">

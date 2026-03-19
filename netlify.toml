@@ -31,6 +31,11 @@
   status = 200
 
 [[redirects]]
+  from   = "/api/bulk-action"
+  to     = "/.netlify/functions/bulk-action"
+  status = 200
+
+[[redirects]]
   from   = "/api/emails/*"
   to     = "/.netlify/functions/email-action"
   status = 200
