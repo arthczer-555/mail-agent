@@ -34,13 +34,9 @@ export default async function handler(req: Request) {
     return jsonResponse({ success: true, updated: 0 });
   }
 
-  // Mettre à jour en base
+  // Supprimer de la base (pour permettre le re-polling si remis non lu dans Gmail)
   const ids = (rows as any[]).map((r: any) => r.id);
-  await db`
-    UPDATE emails
-    SET status = 'rejected', validated_at = NOW()
-    WHERE id = ANY(${ids}::uuid[])
-  `;
+  await db`DELETE FROM emails WHERE id = ANY(${ids}::uuid[])`;
 
   // Marquer comme lus dans Gmail (silencieux si erreur)
   try {
