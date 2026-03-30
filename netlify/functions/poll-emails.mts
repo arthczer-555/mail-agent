@@ -60,7 +60,7 @@ export default async function handler(req: Request) {
     const toAutoReject = (pendingRows as any[]).filter(r => r.gmail_id && !unreadGmailIds.has(r.gmail_id));
     if (toAutoReject.length > 0) {
       const ids = toAutoReject.map((r: any) => r.id);
-      await db`UPDATE emails SET status = 'rejected', validated_at = NOW() WHERE id = ANY(${ids})`.catch(() => {});
+      await db`DELETE FROM emails WHERE id = ANY(${ids})`.catch(() => {});
       console.log(`[poll-emails] ${toAutoReject.length} email(s) lus dans Gmail → rejetés automatiquement`);
     }
 
