@@ -8,13 +8,30 @@ Agent email autonome : lit Gmail, classifie avec Claude, propose des brouillons,
 
 ```
 Netlify (plan gratuit)
-├── Frontend React (dashboard de validation)
+├── Frontend React (dashboard Kanban de validation)
 ├── Netlify Functions (API endpoints)
-└── poll-emails — fonction HTTP manuelle (cron auto disponible sur Netlify Pro)
+└── manual-poll — polling Gmail déclenché manuellement (cron auto sur Netlify Pro)
 
 Supabase (PostgreSQL gratuit)
 └── Base de données (emails, guide, exemples, règles)
 ```
+
+---
+
+## Fonctionnalités
+
+- **Classification automatique** : chaque email reçu est classé par Claude (Urgent / Important / Normal / Faible)
+- **Brouillon de réponse** : Claude rédige un brouillon basé sur le guide de réponses et les exemples
+- **Dashboard Kanban** : 4 colonnes par priorité, palette rose Coachello (#F0024F)
+- **Reply All** : les réponses incluent tous les destinataires (To + CC) sauf l'expéditeur Coachello
+- **Redraft avec contexte** : possibilité de donner des instructions à Claude pour régénérer le brouillon
+- **Envoyer & Enregistrer** : envoyer la réponse et sauvegarder l'échange comme exemple pour Claude
+- **Mark as read / Tout lire** : supprime l'email de la DB + le marque comme lu dans Gmail (repasse en non lu dans Gmail → re-polling automatique)
+- **Alerte URGENT** : notification email automatique quand un email est classé comme urgent
+- **Signaler comme spam** : marque l'email comme spam dans Gmail
+- **Brouillon Gmail** : enregistre la réponse comme brouillon dans Gmail (pour URGENT/IMPORTANT)
+- **Administration** : gestion du guide de réponses, exemples, et règles de classification
+- **Encodage UTF-8** : sujets non-ASCII correctement encodés (RFC 2047)
 
 ---
 
@@ -92,6 +109,8 @@ git push -u origin main
 | `GMAIL_REFRESH_TOKEN` | Refresh token obtenu via OAuth Playground                     |
 | `GMAIL_ADDRESS`       | Adresse Gmail surveillée (ex: contact@coachello.io)           |
 | `ANTHROPIC_API_KEY`   | `sk-ant-...`                                                  |
+| `URGENT_ALERT_EMAIL`  | Adresse qui reçoit les alertes urgentes (optionnel)           |
+| `VITE_APP_PASSWORD`   | Mot de passe pour accéder au dashboard                        |
 
 Après avoir ajouté les variables : **Trigger deploy** → le site est en ligne.
 
@@ -106,23 +125,26 @@ Dans Netlify : Domain Settings → Add custom domain → `agent.coachello.io`
 ## Utilisation au quotidien
 
 ### Dashboard
-- Accéder via l'URL Netlify
-- 4 colonnes : Urgent (rouge) / Important (orange) / Normal (jaune) / Faible (vert)
-- Cliquer sur un email pour voir l'email original + le brouillon proposé
-- Valider, Modifier ou Rejeter
+- Accéder via l'URL Netlify (mot de passe requis)
+- 4 colonnes Kanban : **Urgent** (rose vif) / **Important** (rose) / **Normal** (rose clair) / **Faible** (rose pâle)
+- Cliquer sur un email pour voir l'original + le brouillon proposé par Claude
+- Actions disponibles :
+  - **Envoyer** : envoie la réponse (direct pour Normal/Faible, brouillon Gmail pour Urgent/Important)
+  - **Envoyer & Enregistrer** : envoie + sauvegarde comme exemple dans le guide
+  - **Brouillon Gmail** : crée un brouillon dans Gmail sans envoyer
+  - **Marquer comme lu** : supprime de la DB et marque comme lu dans Gmail
+  - **Signaler** : marque comme spam dans Gmail
+  - **Donner du contexte** : ajouter des instructions pour régénérer le brouillon
+- Colonne Faible : bouton **Tout lire** pour marquer tous les emails faibles comme lus d'un coup
 
-### Déclencher le polling Gmail (plan gratuit)
+### Polling Gmail
+- Cliquer **Lancer le polling** en bas à droite du dashboard
+- Le badge affiche le nombre de mails non lus dans Gmail
+- **Actualiser** recharge la liste depuis la base (sans re-pollier Gmail)
 
-Sur le plan gratuit, le polling n'est pas automatique. Pour lancer une collecte :
-
-```
-GET https://ton-site.netlify.app/.netlify/functions/poll-emails
-```
-
-Ouvrir cette URL dans le navigateur, ou l'appeler via curl/Postman. Les nouveaux emails apparaissent ensuite dans le dashboard.
-
-### Administration
-- **Guide & Exemples** : uploader ou éditer le document de référence (.docx ou texte), télécharger le guide actuel, gérer les emails d'exemple utilisés par Claude
+### Administration (panneau Admin)
+- **Guide** : uploader ou éditer le document de référence (.docx ou texte)
+- **Exemples** : gérer les emails d'exemple utilisés par Claude pour s'améliorer
 - **Règles** : définir des règles de classification automatique par expéditeur, domaine ou mot-clé
 
 ---
@@ -132,25 +154,31 @@ Ouvrir cette URL dans le navigateur, ou l'appeler via curl/Postman. Les nouveaux
 ```
 coachello-email-agent/
 ├── netlify/functions/
-│   ├── _db.ts              ← Helper connexion Supabase (postgres.js)
-│   ├── _gmail.ts           ← Helper client Gmail
-│   ├── _claude.ts          ← Helper appel Claude (claude-sonnet-4-6)
-│   ├── poll-emails.mts     ← Polling Gmail — manuel (plan gratuit) / cron sur Pro
-│   ├── get-emails.mts      ← GET /api/emails
-│   ├── email-action.mts    ← POST /api/emails/:id/:action
-│   ├── upload-guide.mts    ← GET/POST /api/guide
-│   ├── manage-examples.mts ← GET/POST/DELETE /api/examples
-│   └── manage-rules.mts    ← GET/POST/DELETE /api/rules
+│   ├── _db.ts                      ← Helper connexion Supabase (postgres.js)
+│   ├── _gmail.ts                   ← Helper client Gmail + buildRawEmail (RFC 2047)
+│   ├── _claude.ts                  ← Helper appel Claude (claude-sonnet-4-6)
+│   ├── manual-poll.mts             ← Polling Gmail manuel (bouton dashboard)
+│   ├── poll-emails.mts             ← Polling Gmail (cron sur Netlify Pro)
+│   ├── get-emails.mts              ← GET /api/emails
+│   ├── email-action.mts            ← POST /api/emails/:id/:action
+│   ├── email-redraft-background.mts ← Background function pour redraft Claude
+│   ├── bulk-action.mts             ← POST /api/bulk-action (mark all as read)
+│   ├── upload-guide.mts            ← GET/POST /api/guide
+│   ├── manage-examples.mts         ← GET/POST/PUT/DELETE /api/examples
+│   └── manage-rules.mts            ← GET/POST/DELETE /api/rules
 ├── src/
-│   ├── App.tsx
+│   ├── App.tsx                     ← Login + routing
 │   ├── main.tsx
 │   ├── index.css
-│   ├── types.ts
+│   ├── types.ts                    ← Types + CLASSIFICATION_CONFIG (palette rose)
 │   └── components/
-│       ├── Dashboard.tsx
-│       ├── EmailCard.tsx
-│       ├── EmailDetail.tsx
-│       └── AdminPanel.tsx   ← Guide + Exemples fusionnés
+│       ├── Dashboard.tsx            ← Kanban 4 colonnes + polling
+│       ├── EmailCard.tsx            ← Carte email avec bordure colorée
+│       ├── EmailDetail.tsx          ← Modal détail + actions + redraft
+│       └── AdminPanel.tsx           ← Guide + Exemples + Règles
+├── public/
+│   ├── logo-coachello.png
+│   └── sigle-coachello.png         ← Favicon
 ├── schema.sql
 ├── netlify.toml
 ├── package.json
