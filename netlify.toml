@@ -31,6 +31,16 @@
   status = 200
 
 [[redirects]]
+  from   = "/api/attachment"
+  to     = "/.netlify/functions/attachment-proxy"
+  status = 200
+
+[[redirects]]
+  from   = "/api/sync-read"
+  to     = "/.netlify/functions/sync-read"
+  status = 200
+
+[[redirects]]
   from   = "/api/bulk-action"
   to     = "/.netlify/functions/bulk-action"
   status = 200

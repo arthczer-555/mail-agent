@@ -30,6 +30,7 @@ export default async function handler(req: Request) {
       emails = await db`
         SELECT id, gmail_id, thread_id, from_email, from_name, subject,
                LEFT(body_text, 5000) AS body_text,
+               body_html,
                LEFT(body_text, 200) AS body_preview,
                received_at, classification, reasoning,
                LEFT(draft_response, 300) AS draft_preview,
@@ -52,6 +53,7 @@ export default async function handler(req: Request) {
       emails = await db`
         SELECT id, gmail_id, thread_id, from_email, from_name, subject,
                LEFT(body_text, 5000) AS body_text,
+               body_html,
                LEFT(body_text, 200) AS body_preview,
                received_at, classification, reasoning,
                LEFT(draft_response, 300) AS draft_preview,
@@ -75,6 +77,7 @@ export default async function handler(req: Request) {
       emails = await db`
         SELECT id, gmail_id, thread_id, from_email, from_name, subject,
                LEFT(body_text, 5000) AS body_text,
+               body_html,
                LEFT(body_text, 200) AS body_preview,
                received_at, classification, reasoning,
                LEFT(draft_response, 300) AS draft_preview,

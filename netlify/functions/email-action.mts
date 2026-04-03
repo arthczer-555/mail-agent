@@ -4,7 +4,7 @@
 // ============================================================
 import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse, errorResponse } from './_db.js';
-import { getGmailClient, buildRawEmail } from './_gmail.js';
+import { getGmailClient, buildRawEmail, type OutgoingAttachment } from './_gmail.js';
 import { askClarifyingQuestions } from './_claude.js';
 
 // Extraire l'adresse email d'une entrée "Nom <email>" ou "email"
@@ -41,7 +41,9 @@ export default async function handler(req: Request) {
     const email = (rows as any[])[0];
 
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
-    const { user = 'team', final_response } = body as { user?: string; final_response?: string };
+    const { user = 'team', final_response, attachments: reqAttachments } = body as {
+      user?: string; final_response?: string; attachments?: OutgoingAttachment[];
+    };
 
     // ──────────────────────────────────────────────────
     // ACTION : lock (un membre de l'équipe ouvre l'email)
@@ -145,6 +147,7 @@ export default async function handler(req: Request) {
         cc:         ccList,
         threadId:   email.thread_id,
         inReplyTo,
+        attachments: reqAttachments,
       });
 
       // URGENT et IMPORTANT → brouillon (validation humaine finale dans Gmail)
@@ -223,6 +226,7 @@ export default async function handler(req: Request) {
         cc:        ccList,
         threadId:  email.thread_id,
         inReplyTo,
+        attachments: reqAttachments,
       });
 
       await gmail.users.drafts.create({

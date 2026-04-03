@@ -40,6 +40,8 @@ export default function Dashboard() {
   const [unreadCount, setUnreadCount] = useState<number | null>(null)
   const [markingAllRead, setMarkingAllRead] = useState(false)
 
+  const [draftCount, setDraftCount] = useState(0)
+
   const fetchEmails = useCallback(async () => {
     try {
       const res      = await fetch('/api/emails')
@@ -50,6 +52,11 @@ export default function Dashboard() {
       setLastRefresh(new Date())
       setRefreshed(true)
       setTimeout(() => setRefreshed(false), 2000)
+      // Compter les brouillons Gmail
+      fetch('/api/manual-poll?drafts=true')
+        .then(r => r.json())
+        .then(d => { if (d.drafts !== undefined) setDraftCount(d.drafts) })
+        .catch(() => {})
     } catch (err) {
       console.error('Erreur fetchEmails:', err)
     } finally {
@@ -65,6 +72,10 @@ export default function Dashboard() {
     } catch {
       // silencieux
     }
+  }, [])
+
+  const syncRead = useCallback(async () => {
+    await fetch('/api/sync-read').catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -92,6 +103,9 @@ export default function Dashboard() {
     setPollProgress(null)
 
     try {
+      // Sync-read d'abord (supprimer les emails lus dans Gmail)
+      await syncRead()
+      // Puis polling des nouveaux emails
       const res  = await fetch('/api/manual-poll')
       const text = await res.text()
       let data: any
@@ -101,8 +115,8 @@ export default function Dashboard() {
         setPollResult(`Erreur ${res.status}${data?.error ? ` : ${data.error}` : ''}`)
       } else {
         setPollResult(data.processed > 0 ? `${data.processed} email(s) traité(s)` : 'Aucun nouveau mail')
-        if (data.processed > 0) fetchEmails()
       }
+      fetchEmails()
     } catch (err) {
       setPollResult(`Erreur réseau`)
     }
@@ -211,7 +225,7 @@ export default function Dashboard() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) handleClose() }}
         >
-          <div className="w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl">
+          <div className="w-full max-w-7xl min-h-[70vh] max-h-[95vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl">
             <ModalErrorBoundary onClose={handleClose}>
               <EmailDetail
                 email={selectedEmail}
@@ -226,45 +240,61 @@ export default function Dashboard() {
       )}
 
       {/* ── Barre du bas ── */}
-      <div className="fixed bottom-4 right-6 text-xs text-[#aaa] flex items-center gap-3">
+      <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-2 text-xs text-[#aaa] px-6">
 
-        {/* Résultat / progression */}
-        {polling && pollProgress ? (
-          <span className="text-[#555] font-medium">
-            Traitement {pollProgress.done} / {pollProgress.total}...
-          </span>
-        ) : pollResult ? (
-          <span className={`px-2.5 py-1 rounded-full font-semibold ${
-            pollResult.startsWith('Erreur') || pollResult.startsWith('Réseau')
-              ? 'bg-[#FEE9E5] text-[#C23B2A]'
-              : 'bg-[#EDE8E0] text-[#555]'
-          }`}>
-            {pollResult}
-          </span>
-        ) : null}
-
-        {/* Badge mails non lus */}
-        {unreadCount !== null && unreadCount > 0 && (
-          <span className="bg-[#E8452A] text-white font-bold px-2.5 py-0.5 rounded-full">
-            {unreadCount} non lu{unreadCount > 1 ? 's' : ''}
-          </span>
-        )}
-
+        {/* Bouton polling — centré */}
         <button
           onClick={handlePoll}
           disabled={polling}
-          className="hover:text-[#E8452A] transition-colors underline underline-offset-2 disabled:opacity-40"
+          className="px-4 py-2 rounded-xl font-semibold text-white bg-[#F0024F] hover:bg-[#d00245] transition-colors disabled:opacity-40 text-sm shadow-sm"
         >
-          {polling ? 'Polling...' : 'Lancer le polling'}
+          {polling ? (
+            <span className="flex items-center gap-1.5">
+              <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
+              Recherche...
+            </span>
+          ) : 'Chercher nouveaux emails'}
         </button>
-        <span className="text-[#D8D0C5]">·</span>
-        <button
-          onClick={fetchEmails}
-          className="hover:text-[#E8452A] transition-colors underline underline-offset-2"
-        >
-          {refreshed ? 'Actualisé ✓' : 'Actualiser'}
-        </button>
-        <span>— {lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+
+        {/* Badges et infos secondaires */}
+        <div className="flex items-center justify-center gap-3">
+          {/* Résultat / progression */}
+          {polling && pollProgress ? (
+            <span className="text-[#555] font-medium">
+              Traitement {pollProgress.done} / {pollProgress.total}...
+            </span>
+          ) : pollResult ? (
+            <span className={`px-2.5 py-1 rounded-full font-semibold ${
+              pollResult.startsWith('Erreur') || pollResult.startsWith('Réseau')
+                ? 'bg-[#FEE9E5] text-[#C23B2A]'
+                : 'bg-[#EDE8E0] text-[#555]'
+            }`}>
+              {pollResult}
+            </span>
+          ) : null}
+
+          {/* Badge brouillons à envoyer */}
+          {draftCount > 0 && (
+            <span className="bg-[#F768A8] text-white font-bold px-2.5 py-0.5 rounded-full">
+              {draftCount} brouillon{draftCount > 1 ? 's' : ''} à envoyer
+            </span>
+          )}
+
+          {/* Badge mails non lus */}
+          {unreadCount !== null && unreadCount > 0 && (
+            <span className="bg-[#E8452A] text-white font-bold px-2.5 py-0.5 rounded-full">
+              {unreadCount} non lu{unreadCount > 1 ? 's' : ''}
+            </span>
+          )}
+
+          <button
+            onClick={fetchEmails}
+            className="hover:text-[#E8452A] transition-colors underline underline-offset-2"
+          >
+            {refreshed ? 'Actualisé ✓' : 'Actualiser'}
+          </button>
+          <span>— {lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
       </div>
     </div>
   )

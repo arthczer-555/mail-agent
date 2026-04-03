@@ -6,6 +6,7 @@ export interface EmailAttachment {
   mimeType: string;
   size: number;
   attachmentId: string;
+  contentId?: string;  // Présent pour les images inline (cid:)
 }
 
 export interface Email {
@@ -19,6 +20,7 @@ export interface Email {
   cc_emails?: string;
   subject: string;
   body_text?: string;
+  body_html?: string;
   body_preview?: string;
   received_at: string;
   classification: Classification;

@@ -31,3 +31,51 @@
     @apply bg-white rounded-2xl border border-[#EDE8E0] shadow-sm;
   }
 }
+
+/* Rendu HTML des emails */
+.email-html-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.email-html-body a {
+  color: #E8452A;
+  text-decoration: underline;
+}
+.email-html-body blockquote {
+  border-left: 3px solid #D8D0C5;
+  padding-left: 12px;
+  margin: 8px 0;
+  color: #999;
+  max-height: 80px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: max-height 0.3s ease;
+  position: relative;
+}
+.email-html-body blockquote::after {
+  content: '... cliquer pour voir le fil';
+  display: block;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, white);
+  padding: 12px 12px 4px;
+  font-size: 11px;
+  color: #aaa;
+}
+.email-html-body blockquote.expanded {
+  max-height: none;
+}
+.email-html-body blockquote.expanded::after {
+  display: none;
+}
+.email-html-body table {
+  max-width: 100%;
+  border-collapse: collapse;
+  font-size: inherit;
+}
+.email-html-body td, .email-html-body th {
+  padding: 4px 8px;
+}

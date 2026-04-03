@@ -41,8 +41,9 @@ export default async function handler(req: Request) {
     const rules    = ruleRows    as any[];
 
     // ── 2. Récupérer les IDs des emails déjà traités ──
-    const processedRows = await db`SELECT gmail_id FROM emails WHERE created_at > NOW() - INTERVAL '7 days' AND status NOT IN ('dismissed', 'rejected')`;
+    const processedRows = await db`SELECT gmail_id, status FROM emails WHERE created_at > NOW() - INTERVAL '7 days' AND status NOT IN ('dismissed', 'rejected')`;
     const processedIds  = new Set((processedRows as any[]).map((r: any) => r.gmail_id));
+    const pendingGmailIds = new Set((processedRows as any[]).filter((r: any) => r.status === 'pending').map((r: any) => r.gmail_id));
 
     // ── 3. Lister les emails non lus dans Gmail ──
     const listRes = await gmail.users.messages.list({
@@ -62,6 +63,25 @@ export default async function handler(req: Request) {
       const ids = toAutoReject.map((r: any) => r.id);
       await db`DELETE FROM emails WHERE id = ANY(${ids})`.catch(() => {});
       console.log(`[poll-emails] ${toAutoReject.length} email(s) lus dans Gmail → rejetés automatiquement`);
+    }
+
+    // ── 3b. MAJ body_html + attachments pour les emails pending existants (sans rappeler Claude) ──
+    const pendingToUpdate = messages.filter(m => m.id && pendingGmailIds.has(m.id!));
+    if (pendingToUpdate.length > 0) {
+      await Promise.all(pendingToUpdate.map(async ({ id: gmailId }) => {
+        try {
+          const msgRes = await gmail.users.messages.get({ userId: 'me', id: gmailId!, format: 'full' });
+          const payload = msgRes.data.payload;
+          if (!payload) return;
+          const { html: bodyHtml } = extractBody(payload);
+          const atts = extractAttachments(payload);
+          await db`
+            UPDATE emails SET body_html = ${bodyHtml ?? ''}, attachments = ${JSON.stringify(atts)}::jsonb
+            WHERE gmail_id = ${gmailId!} AND status = 'pending'
+          `.catch(() => {});
+          console.log(`[poll-emails] ↻ MAJ attachments/html pour ${gmailId} (${atts.length} pièce(s))`);
+        } catch {}
+      }));
     }
 
     // ── 4. Traiter chaque email nouveau en parallèle ──
@@ -118,7 +138,7 @@ export default async function handler(req: Request) {
           body: effectiveBody.slice(0, 3000),
         });
 
-        // ── 6. Stocker en base (avec fallback si colonne attachments absente) ──
+        // ── 6. Stocker en base (upsert : MAJ body_html + attachments si email pending) ──
         try {
           await db`
             INSERT INTO emails (
@@ -131,7 +151,10 @@ export default async function handler(req: Request) {
               ${result.classification}, ${result.reasoning}, ${result.draft_response}, 'pending',
               ${JSON.stringify(attachments)}::jsonb
             )
-            ON CONFLICT (gmail_id) DO NOTHING
+            ON CONFLICT (gmail_id) DO UPDATE SET
+              body_html   = EXCLUDED.body_html,
+              attachments = EXCLUDED.attachments
+            WHERE emails.status = 'pending'
           `;
         } catch {
           await db`
@@ -144,7 +167,9 @@ export default async function handler(req: Request) {
               ${subject}, ${effectiveBody ?? ''}, ${bodyHtml ?? ''}, ${receivedAt},
               ${result.classification}, ${result.reasoning}, ${result.draft_response}, 'pending'
             )
-            ON CONFLICT (gmail_id) DO NOTHING
+            ON CONFLICT (gmail_id) DO UPDATE SET
+              body_html = EXCLUDED.body_html
+            WHERE emails.status = 'pending'
           `;
         }
 
