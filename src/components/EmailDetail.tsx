@@ -32,6 +32,12 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
   const attachments = Array.isArray(email.attachments) ? email.attachments : []
   const gmailUrl    = `https://mail.google.com/mail/u/0/#inbox/${email.gmail_id}`
 
+  // Lock à l'ouverture, unlock à la fermeture
+  useEffect(() => {
+    fetch(`/api/emails/${email.id}/lock`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: 'team' }) }).catch(() => {})
+    return () => { fetch(`/api/emails/${email.id}/unlock`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: 'team' }) }).catch(() => {}) }
+  }, [email.id])
+
   const handleRedraft = async () => {
     if (!contextText.trim()) return
     setRedraftLoading(true)
