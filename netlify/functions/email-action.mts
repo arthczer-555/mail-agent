@@ -161,10 +161,18 @@ export default async function handler(req: Request) {
       }).catch(() => {/* silencieux */});
 
       if (sendDirect) {
-        await gmail.users.messages.send({
+        const sendRes = await gmail.users.messages.send({
           userId: 'me',
           requestBody: { raw, threadId: email.thread_id },
         });
+        // Marquer le message envoyé comme lu pour éviter qu'il réapparaisse dans le polling
+        if (sendRes.data.id) {
+          await gmail.users.messages.modify({
+            userId: 'me',
+            id: sendRes.data.id,
+            requestBody: { removeLabelIds: ['UNREAD', 'INBOX'] },
+          }).catch(() => {});
+        }
         await db`
           UPDATE emails
           SET status = 'sent', validated_by = ${user}, validated_at = NOW(),

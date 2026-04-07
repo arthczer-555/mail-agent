@@ -13,6 +13,9 @@ export default async function handler(req: Request) {
   }
 
   const gmail = getGmailClient();
+  const gmailAddress = (process.env.GMAIL_ADDRESS ?? '').toLowerCase();
+  // Exclure nos propres envois : -from:me ET -from:adresse explicite
+  const excludeSelf = gmailAddress ? `is:unread -from:me -from:${gmailAddress} newer_than:3d` : 'is:unread -from:me newer_than:3d';
 
   const url = new URL(req.url);
 
@@ -21,7 +24,7 @@ export default async function handler(req: Request) {
     try {
       const listRes = await gmail.users.messages.list({
         userId: 'me',
-        q: 'is:unread -from:me newer_than:3d',
+        q: excludeSelf,
         maxResults: 50,
       });
       return jsonResponse({ count: listRes.data.messages?.length ?? 0 });
@@ -64,7 +67,7 @@ export default async function handler(req: Request) {
     // ── 3. Lister les emails non lus dans Gmail ──
     const listRes = await gmail.users.messages.list({
       userId: 'me',
-      q: 'is:unread -from:me newer_than:3d',
+      q: excludeSelf,
       maxResults: 20,
     });
 
