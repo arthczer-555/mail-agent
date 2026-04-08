@@ -38,11 +38,14 @@ export default function EmailDetail({ email, onClose, onAction, onRefresh }: Pro
 
   const conf        = CLASSIFICATION_CONFIG[email.classification] ?? CLASSIFICATION_CONFIG['NORMAL']
   const body        = email.body_text || email.body_preview || '(corps vide)'
-  const attachments: EmailAttachment[] = Array.isArray(email.attachments)
-    ? email.attachments
-    : typeof email.attachments === 'string'
-      ? (() => { try { return JSON.parse(email.attachments as string) as EmailAttachment[] } catch { return [] as EmailAttachment[] } })()
-      : []
+  const attachments: EmailAttachment[] = (() => {
+    let raw = email.attachments;
+    if (!raw) return [];
+    if (typeof raw === 'string') {
+      try { raw = JSON.parse(raw); } catch { return []; }
+    }
+    return Array.isArray(raw) ? raw : [];
+  })()
   const gmailUrl    = `https://mail.google.com/mail/u/0/#inbox/${email.gmail_id}`
 
   // Séparer le dernier message du fil cité (mode texte)

@@ -46,7 +46,7 @@ export default function Dashboard() {
     try {
       const res      = await fetch('/api/emails')
       const data     = await res.json()
-      const newEmails: Email[] = data.emails ?? []
+      const newEmails: Email[] = Array.isArray(data.emails) ? data.emails : []
       setEmails(newEmails)
       setSelected(prev => prev ? (newEmails.find(e => e.id === prev.id) ?? prev) : null)
       setLastRefresh(new Date())
@@ -169,17 +169,17 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-8rem)]">
+    <div className="h-[calc(100vh-8rem)]">
 
       {/* ── Colonnes du Kanban ── */}
-      <div className="flex gap-4 flex-1">
+      <div className="grid grid-cols-4 gap-4 h-full">
         {COLUMNS.map(classification => {
           const conf         = CLASSIFICATION_CONFIG[classification]
           const colStyle     = COLUMN_STYLE[classification]
           const columnEmails = emails.filter(e => e.classification === classification)
 
           return (
-            <div key={classification} className="flex-1 flex flex-col min-w-0">
+            <div key={classification} className="flex flex-col min-w-0 overflow-hidden">
               <div className={`flex items-center justify-between px-3 py-2.5 rounded-2xl mb-3 ${colStyle.header}`}>
                 <span className={`text-xs uppercase tracking-wider whitespace-nowrap ${colStyle.label}`}>{conf.label}</span>
                 <div className="flex items-center gap-2">
