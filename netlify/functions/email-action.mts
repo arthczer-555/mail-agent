@@ -150,55 +150,36 @@ export default async function handler(req: Request) {
         attachments: reqAttachments,
       });
 
-      // URGENT et IMPORTANT → brouillon (validation humaine finale dans Gmail)
-      // NORMAL et FAIBLE    → envoi direct
-      const sendDirect = ['NORMAL', 'FAIBLE'].includes(email.classification);
+      // Envoi direct pour toutes les classifications
+      const sendRes = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: { raw, threadId: email.thread_id },
+      });
 
-      const markAsRead = () => gmail.users.messages.modify({
+      // Marquer le message envoyé comme lu pour éviter qu'il réapparaisse dans le polling
+      if (sendRes.data.id) {
+        await gmail.users.messages.modify({
+          userId: 'me',
+          id: sendRes.data.id,
+          requestBody: { removeLabelIds: ['UNREAD', 'INBOX'] },
+        }).catch(() => {});
+      }
+
+      await db`
+        UPDATE emails
+        SET status = 'sent', validated_by = ${user}, validated_at = NOW(),
+            final_response = ${responseText}
+        WHERE id = ${emailId}
+      `;
+
+      // Marquer l'email original comme lu
+      await gmail.users.messages.modify({
         userId: 'me',
         id: email.gmail_id,
         requestBody: { removeLabelIds: ['UNREAD'] },
-      }).catch(() => {/* silencieux */});
+      }).catch(() => {});
 
-      if (sendDirect) {
-        const sendRes = await gmail.users.messages.send({
-          userId: 'me',
-          requestBody: { raw, threadId: email.thread_id },
-        });
-        // Marquer le message envoyé comme lu pour éviter qu'il réapparaisse dans le polling
-        if (sendRes.data.id) {
-          await gmail.users.messages.modify({
-            userId: 'me',
-            id: sendRes.data.id,
-            requestBody: { removeLabelIds: ['UNREAD', 'INBOX'] },
-          }).catch(() => {});
-        }
-        await db`
-          UPDATE emails
-          SET status = 'sent', validated_by = ${user}, validated_at = NOW(),
-              final_response = ${responseText}
-          WHERE id = ${emailId}
-        `;
-        await markAsRead();
-        return jsonResponse({ success: true, action: 'sent' });
-
-      } else {
-        // Brouillon Gmail
-        await gmail.users.drafts.create({
-          userId: 'me',
-          requestBody: {
-            message: { raw, threadId: email.thread_id },
-          },
-        });
-        await db`
-          UPDATE emails
-          SET status = 'draft_saved', validated_by = ${user}, validated_at = NOW(),
-              final_response = ${responseText}
-          WHERE id = ${emailId}
-        `;
-        await markAsRead();
-        return jsonResponse({ success: true, action: 'draft_saved' });
-      }
+      return jsonResponse({ success: true, action: 'sent' });
     }
 
     // ──────────────────────────────────────────────────

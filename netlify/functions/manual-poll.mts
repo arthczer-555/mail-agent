@@ -126,6 +126,8 @@ export default async function handler(req: Request) {
         const headers     = payload.headers ?? [];
         const fromRaw     = getHeader(headers, 'From');
         const toRaw       = getHeader(headers, 'To');
+        const ccRaw       = getHeader(headers, 'Cc');
+        const messageId   = getHeader(headers, 'Message-ID');
         const subject     = getHeader(headers, 'Subject') || '(sans objet)';
         const dateStr     = getHeader(headers, 'Date');
         const receivedAt  = dateStr ? new Date(dateStr).toISOString() : new Date().toISOString();
@@ -173,11 +175,11 @@ export default async function handler(req: Request) {
         try {
           await db`
             INSERT INTO emails (
-              gmail_id, thread_id, from_email, from_name, to_email,
+              gmail_id, thread_id, message_id, from_email, from_name, to_email, cc_emails,
               subject, body_text, body_html, received_at,
               classification, reasoning, draft_response, status, attachments
             ) VALUES (
-              ${gmailId ?? ''}, ${threadId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw ?? ''},
+              ${gmailId ?? ''}, ${threadId ?? ''}, ${messageId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw ?? ''}, ${ccRaw ?? ''},
               ${subject}, ${bodyText ?? ''}, ${bodyHtml ?? ''}, ${receivedAt},
               ${result.classification}, ${result.reasoning}, ${result.draft_response}, 'pending',
               ${JSON.stringify(attachments)}::jsonb
@@ -190,11 +192,11 @@ export default async function handler(req: Request) {
         } catch {
           await db`
             INSERT INTO emails (
-              gmail_id, thread_id, from_email, from_name, to_email,
+              gmail_id, thread_id, message_id, from_email, from_name, to_email, cc_emails,
               subject, body_text, body_html, received_at,
               classification, reasoning, draft_response, status
             ) VALUES (
-              ${gmailId ?? ''}, ${threadId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw ?? ''},
+              ${gmailId ?? ''}, ${threadId ?? ''}, ${messageId ?? ''}, ${fromEmail}, ${fromName}, ${toRaw ?? ''}, ${ccRaw ?? ''},
               ${subject}, ${bodyText ?? ''}, ${bodyHtml ?? ''}, ${receivedAt},
               ${result.classification}, ${result.reasoning}, ${result.draft_response}, 'pending'
             )
