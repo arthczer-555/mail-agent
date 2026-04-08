@@ -43,9 +43,11 @@ export default async function handler(req: Request) {
     const rules    = ruleRows    as any[];
 
     // ── 2. Récupérer les IDs des emails déjà traités ──
-    const processedRows = await db`SELECT gmail_id, status FROM emails WHERE created_at > NOW() - INTERVAL '7 days' AND status NOT IN ('dismissed', 'rejected')`;
+    const processedRows = await db`SELECT gmail_id, thread_id, status FROM emails WHERE created_at > NOW() - INTERVAL '7 days' AND status NOT IN ('dismissed', 'rejected')`;
     const processedIds  = new Set((processedRows as any[]).map((r: any) => r.gmail_id));
     const pendingGmailIds = new Set((processedRows as any[]).filter((r: any) => r.status === 'pending').map((r: any) => r.gmail_id));
+    // Threads auxquels on a déjà répondu — ne pas retraiter les nouveaux messages du même thread
+    const sentThreadIds = new Set((processedRows as any[]).filter((r: any) => ['sent', 'draft_saved'].includes(r.status)).map((r: any) => r.thread_id).filter(Boolean));
 
     // ── 3. Lister les emails non lus dans Gmail ──
     const listRes = await gmail.users.messages.list({
@@ -87,7 +89,8 @@ export default async function handler(req: Request) {
     }
 
     // ── 4. Traiter chaque email nouveau en parallèle ──
-    const toProcess = messages.filter(m => m.id && !processedIds.has(m.id!));
+    // Exclure les emails déjà traités ET ceux dont le thread a déjà reçu une réponse
+    const toProcess = messages.filter(m => m.id && !processedIds.has(m.id!) && !(m.threadId && sentThreadIds.has(m.threadId)));
     const skipped = messages.length - toProcess.length;
     console.log(`[poll-emails] ${toProcess.length} email(s) à traiter, ${skipped} déjà traité(s)`);
 
@@ -116,6 +119,16 @@ export default async function handler(req: Request) {
         const fromMatch = fromRaw.match(/^(.*?)\s*<(.+?)>$/) ?? [null, fromRaw, fromRaw];
         const fromName  = (fromMatch[1] ?? '').replace(/"/g, '').trim();
         const fromEmail = (fromMatch[2] ?? fromRaw).trim();
+
+        // ── Ignorer nos propres envois (filet de sécurité si -from:me a échoué) ──
+        if (gmailAddress && fromEmail.toLowerCase() === gmailAddress) {
+          console.log(`[poll-emails] ⏭ Ignoré (notre propre envoi) : ${subject}`);
+          await gmail.users.messages.modify({
+            userId: 'me', id: gmailId!,
+            requestBody: { removeLabelIds: ['UNREAD'] },
+          }).catch(() => {});
+          return 'skipped';
+        }
 
         const { text: bodyText, html: bodyHtml } = extractBody(payload);
         const attachments = extractAttachments(payload);
