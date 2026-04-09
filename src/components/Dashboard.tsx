@@ -131,7 +131,7 @@ export default function Dashboard() {
 
   // Après valider/rejeter : fermer et rafraîchir
   const handleAction = () => {
-    const emailId = selected?.id
+    const emailId = selectedEmail?.id
     setSelected(null)
     // Retirer l'email immédiatement (optimiste) pour éviter qu'il reste affiché
     if (emailId) {
