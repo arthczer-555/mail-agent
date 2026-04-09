@@ -65,6 +65,11 @@
   to     = "/.netlify/functions/manage-rules"
   status = 200
 
+[[redirects]]
+  from   = "/api/compose"
+  to     = "/.netlify/functions/compose-email"
+  status = 200
+
 # ── SPA fallback (React Router) ──
 [[redirects]]
   from   = "/*"
