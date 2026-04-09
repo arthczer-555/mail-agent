@@ -171,8 +171,10 @@ export function buildRawEmail(opts: {
   inReplyTo?: string;
   attachments?: OutgoingAttachment[];
 }): string {
-  // Ajouter "Re: " seulement si pas déjà présent
-  const subjectLine = /^Re:\s/i.test(opts.subject) ? opts.subject : `Re: ${opts.subject}`;
+  // Ajouter "Re: " seulement pour les réponses (inReplyTo présent) et si pas déjà présent
+  const subjectLine = opts.inReplyTo && !/^Re:\s/i.test(opts.subject)
+    ? `Re: ${opts.subject}`
+    : opts.subject;
   const hasAttachments = opts.attachments && opts.attachments.length > 0;
 
   const headers = [
