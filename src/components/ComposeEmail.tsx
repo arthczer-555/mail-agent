@@ -5,9 +5,71 @@ interface Props {
   onSent: () => void
 }
 
+function EmailTagInput({ emails, setEmails, placeholder }: {
+  emails: string[];
+  setEmails: (v: string[]) => void;
+  placeholder: string;
+}) {
+  const [input, setInput] = useState('')
+
+  const addEmail = (value: string) => {
+    const trimmed = value.trim().replace(/,+$/, '').trim()
+    if (trimmed && !emails.includes(trimmed)) {
+      setEmails([...emails, trimmed])
+    }
+    setInput('')
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.key === 'Enter' || e.key === ',' || e.key === 'Tab') && input.trim()) {
+      e.preventDefault()
+      addEmail(input)
+    }
+    if (e.key === 'Backspace' && !input && emails.length > 0) {
+      setEmails(emails.slice(0, -1))
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text')
+    const parts = pasted.split(/[,;\s]+/).filter(Boolean)
+    const newEmails = [...emails]
+    parts.forEach(p => {
+      const trimmed = p.trim()
+      if (trimmed && !newEmails.includes(trimmed)) newEmails.push(trimmed)
+    })
+    setEmails(newEmails)
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1 mt-1 px-2 py-1.5 border border-[#D8D0C5] rounded-xl focus-within:ring-2 focus-within:ring-[#E8452A] bg-white min-h-[38px]">
+      {emails.map((email, i) => (
+        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#F5F0EB] rounded-full text-xs text-[#555]">
+          {email}
+          <button
+            onClick={() => setEmails(emails.filter((_, j) => j !== i))}
+            className="text-[#aaa] hover:text-[#E8452A] leading-none"
+          >&times;</button>
+        </span>
+      ))}
+      <input
+        type="text"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        onBlur={() => { if (input.trim()) addEmail(input) }}
+        placeholder={emails.length === 0 ? placeholder : ''}
+        className="flex-1 min-w-[120px] text-sm outline-none bg-transparent py-0.5"
+      />
+    </div>
+  )
+}
+
 export default function ComposeEmail({ onClose, onSent }: Props) {
-  const [to, setTo]               = useState('')
-  const [cc, setCc]               = useState('')
+  const [toEmails, setToEmails]   = useState<string[]>([])
+  const [ccEmails, setCcEmails]   = useState<string[]>([])
   const [subject, setSubject]     = useState('')
   const [body, setBody]           = useState('')
   const [instructions, setInstructions] = useState('')
@@ -31,7 +93,7 @@ export default function ComposeEmail({ onClose, onSent }: Props) {
 
   // Demander à Claude de rédiger le mail
   const handleDraft = async () => {
-    if (!to.trim()) return setFeedback('Destinataire requis')
+    if (toEmails.length === 0) return setFeedback('Destinataire requis')
     if (!instructions.trim()) return setFeedback('Donne des instructions à Claude')
 
     setDrafting(true)
@@ -42,7 +104,7 @@ export default function ComposeEmail({ onClose, onSent }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'draft',
-          to: to.trim(),
+          to: toEmails.join(', '),
           subject: subject.trim() || undefined,
           instructions: instructions.trim(),
         }),
@@ -62,7 +124,7 @@ export default function ComposeEmail({ onClose, onSent }: Props) {
 
   // Envoyer l'email
   const handleSend = async () => {
-    if (!to.trim()) return setFeedback('Destinataire requis')
+    if (toEmails.length === 0) return setFeedback('Destinataire requis')
     if (!subject.trim()) return setFeedback('Objet requis')
     if (!body.trim()) return setFeedback('Contenu requis')
 
@@ -78,8 +140,8 @@ export default function ComposeEmail({ onClose, onSent }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'send',
-          to: to.trim(),
-          cc: cc.trim() || undefined,
+          to: toEmails.join(', '),
+          cc: ccEmails.length > 0 ? ccEmails.join(', ') : undefined,
           subject: subject.trim(),
           content: body.trim(),
           attachments,
@@ -98,7 +160,7 @@ export default function ComposeEmail({ onClose, onSent }: Props) {
 
   // Sauvegarder en brouillon Gmail
   const handleSaveDraft = async () => {
-    if (!to.trim()) return setFeedback('Destinataire requis')
+    if (toEmails.length === 0) return setFeedback('Destinataire requis')
     if (!subject.trim()) return setFeedback('Objet requis')
     if (!body.trim()) return setFeedback('Contenu requis')
 
@@ -114,8 +176,8 @@ export default function ComposeEmail({ onClose, onSent }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'draft-gmail',
-          to: to.trim(),
-          cc: cc.trim() || undefined,
+          to: toEmails.join(', '),
+          cc: ccEmails.length > 0 ? ccEmails.join(', ') : undefined,
           subject: subject.trim(),
           content: body.trim(),
           attachments,
@@ -147,25 +209,13 @@ export default function ComposeEmail({ onClose, onSent }: Props) {
         {/* To */}
         <div>
           <label className="text-xs font-semibold text-[#888] uppercase tracking-wider">À</label>
-          <input
-            type="text"
-            value={to}
-            onChange={e => setTo(e.target.value)}
-            placeholder="email@exemple.com"
-            className="w-full mt-1 px-3 py-2 text-sm border border-[#D8D0C5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E8452A] bg-white"
-          />
+          <EmailTagInput emails={toEmails} setEmails={setToEmails} placeholder="email@exemple.com" />
         </div>
 
         {/* CC */}
         <div>
           <label className="text-xs font-semibold text-[#888] uppercase tracking-wider">Cc</label>
-          <input
-            type="text"
-            value={cc}
-            onChange={e => setCc(e.target.value)}
-            placeholder="cc@exemple.com (optionnel)"
-            className="w-full mt-1 px-3 py-2 text-sm border border-[#D8D0C5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E8452A] bg-white"
-          />
+          <EmailTagInput emails={ccEmails} setEmails={setCcEmails} placeholder="cc@exemple.com (optionnel)" />
         </div>
 
         {/* Subject */}
