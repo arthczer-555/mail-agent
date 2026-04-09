@@ -150,6 +150,53 @@ Réponds UNIQUEMENT avec le texte de la réponse, sans introduction ni commentai
   return content.text.trim();
 }
 
+// ── Composer un nouvel email à partir d'instructions ────────────
+export async function composeEmail(opts: {
+  guide: string;
+  examples: Array<{ email_body: string; ideal_response: string; classification: string }>;
+  toEmail: string;
+  toName?: string;
+  subject?: string;
+  instructions: string;
+}): Promise<{ subject: string; body: string }> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const examplesText = opts.examples.length > 0
+    ? opts.examples.slice(0, 5).map((ex, i) =>
+        `Exemple ${i + 1} (${ex.classification}) — Réponse: ${ex.ideal_response.slice(0, 250)}`
+      ).join('\n\n')
+    : '';
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1200,
+    system: `Tu es l'assistant email de Coachello, une plateforme de coaching digital.
+Tu rédiges des emails professionnels pour l'équipe en suivant le guide de l'entreprise.
+
+## Guide de réponse de l'entreprise
+${opts.guide || 'Utilise un ton professionnel, chaleureux et concis. Signe toujours avec "L\'équipe Coachello".'}
+${examplesText ? `\n## Exemples de style validés par l'équipe\n${examplesText}` : ''}
+
+## Instructions
+Rédige un email complet et prêt à envoyer basé sur les instructions de l'équipe.
+Réponds UNIQUEMENT en JSON valide : { "subject": "Objet de l'email", "body": "Corps complet de l'email" }
+${opts.subject ? `L'objet est déjà défini : "${opts.subject}". Utilise-le tel quel dans le champ "subject".` : 'Propose un objet approprié.'}`,
+    messages: [{
+      role: 'user',
+      content: `Destinataire : ${opts.toName ? `${opts.toName} <${opts.toEmail}>` : opts.toEmail}
+${opts.subject ? `Objet : ${opts.subject}` : ''}
+
+Instructions de l'équipe :
+${opts.instructions}`,
+    }],
+  });
+
+  const content = response.content[0];
+  if (content.type !== 'text') throw new Error('Réponse Claude inattendue');
+  const jsonText = content.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+  return JSON.parse(jsonText) as { subject: string; body: string };
+}
+
 // ── Régénérer le brouillon avec les réponses de l'équipe ────────
 export async function redraftWithAnswers(opts: {
   guide: string;

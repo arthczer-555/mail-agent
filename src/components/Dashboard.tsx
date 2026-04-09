@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Email, Classification, CLASSIFICATION_CONFIG } from '../types'
 import EmailCard from './EmailCard'
 import EmailDetail from './EmailDetail'
+import ComposeEmail from './ComposeEmail'
 
 class ModalErrorBoundary extends Component<
   { onClose: () => void; children: React.ReactNode },
@@ -39,6 +40,7 @@ export default function Dashboard() {
   const [pollProgress, setPollProgress] = useState<{ done: number; total: number } | null>(null)
   const [unreadCount, setUnreadCount] = useState<number | null>(null)
   const [markingAllRead, setMarkingAllRead] = useState(false)
+  const [composing, setComposing] = useState(false)
 
   const [draftCount, setDraftCount] = useState(0)
 
@@ -244,22 +246,46 @@ export default function Dashboard() {
         document.body
       )}
 
+      {/* ── Modal compose (Portal) ── */}
+      {composing && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) setComposing(false) }}
+        >
+          <div className="w-full max-w-2xl min-h-[50vh] max-h-[90vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl">
+            <ComposeEmail
+              onClose={() => setComposing(false)}
+              onSent={() => { setComposing(false); fetchEmails() }}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ── Barre du bas ── */}
       <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-2 text-xs text-[#aaa] px-6">
 
-        {/* Bouton polling — centré */}
-        <button
-          onClick={handlePoll}
-          disabled={polling}
-          className="px-4 py-2 rounded-xl font-semibold text-white bg-[#F0024F] hover:bg-[#d00245] transition-colors disabled:opacity-40 text-sm shadow-sm"
-        >
+        {/* Boutons — centré */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setComposing(true)}
+            className="px-4 py-2 rounded-xl font-semibold text-[#F0024F] border border-[#F0024F] hover:bg-[#FEE9E5] transition-colors text-sm shadow-sm"
+          >
+            Nouveau mail
+          </button>
+          <button
+            onClick={handlePoll}
+            disabled={polling}
+            className="px-4 py-2 rounded-xl font-semibold text-white bg-[#F0024F] hover:bg-[#d00245] transition-colors disabled:opacity-40 text-sm shadow-sm"
+          >
           {polling ? (
             <span className="flex items-center gap-1.5">
               <span className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full" />
               Recherche...
             </span>
           ) : 'Chercher nouveaux emails'}
-        </button>
+          </button>
+        </div>
 
         {/* Badges et infos secondaires */}
         <div className="flex items-center justify-center gap-3">
