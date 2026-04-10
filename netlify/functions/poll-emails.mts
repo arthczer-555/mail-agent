@@ -43,7 +43,7 @@ export default async function handler(req: Request) {
     const rules    = ruleRows    as any[];
 
     // ── 2. Récupérer les IDs des emails déjà traités ──
-    const processedRows = await db`SELECT gmail_id, thread_id, status FROM emails WHERE created_at > NOW() - INTERVAL '7 days' AND status NOT IN ('dismissed', 'rejected')`;
+    const processedRows = await db`SELECT gmail_id, thread_id, status FROM emails WHERE created_at > NOW() - INTERVAL '7 days' AND status != 'dismissed'`;
     const processedIds  = new Set((processedRows as any[]).map((r: any) => r.gmail_id));
     const pendingGmailIds = new Set((processedRows as any[]).filter((r: any) => r.status === 'pending').map((r: any) => r.gmail_id));
     // Threads auxquels on a déjà répondu — ne pas retraiter les nouveaux messages du même thread
@@ -65,7 +65,7 @@ export default async function handler(req: Request) {
     const toAutoReject = (pendingRows as any[]).filter(r => r.gmail_id && !unreadGmailIds.has(r.gmail_id));
     if (toAutoReject.length > 0) {
       const ids = toAutoReject.map((r: any) => r.id);
-      await db`DELETE FROM emails WHERE id = ANY(${ids})`.catch(() => {});
+      await db`UPDATE emails SET status = 'rejected' WHERE id = ANY(${ids})`.catch(() => {});
       console.log(`[poll-emails] ${toAutoReject.length} email(s) lus dans Gmail → rejetés automatiquement`);
     }
 

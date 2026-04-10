@@ -76,7 +76,12 @@ export default async function handler(req: Request) {
     // ACTION : reject
     // ──────────────────────────────────────────────────
     if (action === 'reject') {
-      await db`DELETE FROM emails WHERE id = ${emailId}`;
+      // Garder en DB (status='rejected') pour éviter la réingestion par le polling
+      await db`
+        UPDATE emails
+        SET status = 'rejected', validated_by = ${user}, validated_at = NOW()
+        WHERE id = ${emailId}
+      `;
       // Marquer comme lu dans Gmail
       if (email.gmail_id) {
         const gmail = getGmailClient();

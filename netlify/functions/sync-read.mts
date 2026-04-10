@@ -37,7 +37,7 @@ export default async function handler(req: Request) {
 
     if (toRemove.length > 0) {
       const ids = toRemove.map((r: any) => r.id);
-      await db`DELETE FROM emails WHERE id = ANY(${ids})`;
+      await db`UPDATE emails SET status = 'rejected' WHERE id = ANY(${ids})`;
     }
 
     return jsonResponse({ success: true, removed: toRemove.length });
