@@ -18,7 +18,7 @@ export default async function handler(req: Request) {
     // Lister les emails non lus dans Gmail
     const listRes = await gmail.users.messages.list({
       userId: 'me',
-      q: 'is:unread -from:me newer_than:3d',
+      q: 'in:inbox is:unread -from:me newer_than:3d',
       maxResults: 50,
     });
     const unreadIds = new Set(

@@ -10,7 +10,7 @@ import { classifyAndDraftEmail } from './_claude.js';
 export default async function handler(req: Request) {
   const gmail = getGmailClient();
   const gmailAddress = (process.env.GMAIL_ADDRESS ?? '').toLowerCase();
-  const excludeSelf = gmailAddress ? `is:unread -from:me -from:${gmailAddress} newer_than:3d` : 'is:unread -from:me newer_than:3d';
+  const excludeSelf = gmailAddress ? `in:inbox is:unread -from:me -from:${gmailAddress} newer_than:3d` : 'in:inbox is:unread -from:me newer_than:3d';
 
   // ── Mode compteur : retourne le nombre réel de mails non lus ──
   if (new URL(req.url).searchParams.get('count') === 'true') {
@@ -105,6 +105,17 @@ export default async function handler(req: Request) {
 
         const payload = msgRes.data.payload;
         if (!payload) return 'skipped';
+
+        // ── Ignorer les messages envoyés (label SENT) — protection robuste ──
+        const labelIds = msgRes.data.labelIds ?? [];
+        if (labelIds.includes('SENT')) {
+          console.log(`[poll-emails] ⏭ Ignoré (label SENT) : ${gmailId}`);
+          await gmail.users.messages.modify({
+            userId: 'me', id: gmailId!,
+            requestBody: { removeLabelIds: ['UNREAD', 'INBOX'] },
+          }).catch(() => {});
+          return 'skipped';
+        }
 
         const headers     = payload.headers ?? [];
         const fromRaw     = getHeader(headers, 'From');
