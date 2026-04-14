@@ -4,7 +4,7 @@
 // ============================================================
 import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse, errorResponse } from './_db.js';
-import { getGmailClient, buildRawEmail, type OutgoingAttachment } from './_gmail.js';
+import { getGmailClient, buildRawEmail, markAsRead, type OutgoingAttachment } from './_gmail.js';
 import { composeEmail } from './_claude.js';
 
 export default async function handler(req: Request) {
@@ -78,11 +78,7 @@ export default async function handler(req: Request) {
 
       // Marquer comme lu pour ne pas le réingérer
       if (sendRes.data.id) {
-        await gmail.users.messages.modify({
-          userId: 'me',
-          id: sendRes.data.id,
-          requestBody: { removeLabelIds: ['UNREAD', 'INBOX'] },
-        }).catch(() => {});
+        await markAsRead(sendRes.data.id);
       }
 
       return jsonResponse({ success: true, action: 'sent', messageId: sendRes.data.id });

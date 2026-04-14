@@ -3,7 +3,7 @@
 // Body: { action: 'mark-read', classification: 'FAIBLE' }
 // ============================================================
 import { getDb, corsHeaders, jsonResponse, errorResponse } from './_db.js';
-import { getGmailClient } from './_gmail.js';
+import { markAsRead } from './_gmail.js';
 
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {
@@ -35,20 +35,13 @@ export default async function handler(req: Request) {
   }
 
   // 1. D'abord marquer comme lus dans Gmail
-  const gmail    = getGmailClient();
   const gmailIds = (rows as any[]).map((r: any) => r.gmail_id).filter(Boolean);
   const results  = await Promise.allSettled(
-    gmailIds.map((gmailId: string) =>
-      gmail.users.messages.modify({
-        userId: 'me',
-        id:     gmailId,
-        requestBody: { removeLabelIds: ['UNREAD'] },
-      })
-    )
+    gmailIds.map((gmailId: string) => markAsRead(gmailId))
   );
 
   // 2. Identifier quels gmail_ids ont été marqués avec succès
-  const succeededGmailIds = new Set(gmailIds.filter((_, i) => results[i].status === 'fulfilled'));
+  const succeededGmailIds = new Set(gmailIds.filter((_, i) => results[i].status === 'fulfilled' && (results[i] as PromiseFulfilledResult<boolean>).value === true));
   const idsToDelete = (rows as any[]).filter((r: any) => !r.gmail_id || succeededGmailIds.has(r.gmail_id)).map((r: any) => r.id);
   const idsToKeep   = (rows as any[]).filter((r: any) => r.gmail_id && !succeededGmailIds.has(r.gmail_id)).map((r: any) => r.id);
 

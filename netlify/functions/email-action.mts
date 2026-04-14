@@ -4,7 +4,7 @@
 // ============================================================
 import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse, errorResponse } from './_db.js';
-import { getGmailClient, buildRawEmail, type OutgoingAttachment } from './_gmail.js';
+import { getGmailClient, buildRawEmail, markAsRead, type OutgoingAttachment } from './_gmail.js';
 import { askClarifyingQuestions } from './_claude.js';
 
 // Extraire l'adresse email d'une entrée "Nom <email>" ou "email"
@@ -76,25 +76,8 @@ export default async function handler(req: Request) {
     // ACTION : reject
     // ──────────────────────────────────────────────────
     if (action === 'reject') {
-      // 1. D'abord marquer comme lu dans Gmail
-      let gmailOk = false;
-      if (email.gmail_id) {
-        try {
-          const gmail = getGmailClient();
-          await gmail.users.messages.modify({
-            userId: 'me',
-            id: email.gmail_id,
-            requestBody: { removeLabelIds: ['UNREAD'] },
-          });
-          gmailOk = true;
-        } catch (err) {
-          console.error(`[email-action] Échec marquage Gmail pour ${email.gmail_id}:`, err);
-        }
-      } else {
-        gmailOk = true; // Pas de gmail_id → rien à marquer
-      }
+      const gmailOk = email.gmail_id ? await markAsRead(email.gmail_id) : true;
 
-      // 2. Si Gmail OK → supprimer de la DB. Sinon garder pour retry.
       if (gmailOk) {
         await db`DELETE FROM emails WHERE id = ${emailId}`;
       } else {
@@ -181,25 +164,11 @@ export default async function handler(req: Request) {
 
       // Marquer le message envoyé comme lu
       if (sendRes.data.id) {
-        await gmail.users.messages.modify({
-          userId: 'me',
-          id: sendRes.data.id,
-          requestBody: { removeLabelIds: ['UNREAD', 'INBOX'] },
-        }).catch(() => {});
+        await markAsRead(sendRes.data.id);
       }
 
       // Marquer l'email original comme lu dans Gmail AVANT de toucher la DB
-      let gmailOk = false;
-      try {
-        await gmail.users.messages.modify({
-          userId: 'me',
-          id: email.gmail_id,
-          requestBody: { removeLabelIds: ['UNREAD'] },
-        });
-        gmailOk = true;
-      } catch (err) {
-        console.error(`[email-action] Échec marquage Gmail pour ${email.gmail_id}:`, err);
-      }
+      const gmailOk = await markAsRead(email.gmail_id);
 
       // Si Gmail OK → supprimer de la DB. Sinon garder avec status='sent' pour ne pas réingérer.
       if (gmailOk) {
@@ -260,17 +229,7 @@ export default async function handler(req: Request) {
       });
 
       // Marquer comme lu dans Gmail d'abord
-      let gmailOk = false;
-      try {
-        await gmail.users.messages.modify({
-          userId: 'me',
-          id: email.gmail_id,
-          requestBody: { removeLabelIds: ['UNREAD'] },
-        });
-        gmailOk = true;
-      } catch (err) {
-        console.error(`[email-action] Échec marquage Gmail pour ${email.gmail_id}:`, err);
-      }
+      const gmailOk = await markAsRead(email.gmail_id);
 
       if (gmailOk) {
         await db`DELETE FROM emails WHERE id = ${emailId}`;

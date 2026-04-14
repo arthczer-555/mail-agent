@@ -16,6 +16,27 @@ export function getGmailClient() {
   return google.gmail({ version: 'v1', auth: oauth2Client });
 }
 
+// Marquer un message comme lu dans Gmail — avec log explicite en cas d'échec
+export async function markAsRead(gmailId: string): Promise<boolean> {
+  try {
+    const gmail = getGmailClient();
+    await gmail.users.messages.modify({
+      userId: 'me',
+      id: gmailId,
+      requestBody: { removeLabelIds: ['UNREAD'] },
+    });
+    return true;
+  } catch (err: any) {
+    const status = err?.response?.status ?? err?.code ?? 'unknown';
+    const message = err?.response?.data?.error?.message ?? err?.message ?? '';
+    console.error(`[gmail] ✗ Échec markAsRead(${gmailId}) — HTTP ${status}: ${message}`);
+    if (status === 403) {
+      console.error('[gmail] ⚠ Le scope OAuth "gmail.modify" est probablement manquant. Scopes actuels insuffisants pour modifier les labels.');
+    }
+    return false;
+  }
+}
+
 // Décoder le corps d'un email (base64url → string)
 export function decodeBase64(encoded: string): string {
   const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');

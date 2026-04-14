@@ -4,7 +4,7 @@
 // ============================================================
 import type { Config } from '@netlify/functions';
 import { getDb, corsHeaders, jsonResponse } from './_db.js';
-import { getGmailClient, extractBody, extractAttachments, getHeader, buildRawEmail } from './_gmail.js';
+import { getGmailClient, extractBody, extractAttachments, getHeader, buildRawEmail, markAsRead } from './_gmail.js';
 import { classifyAndDraftEmail } from './_claude.js';
 
 export default async function handler(req: Request) {
@@ -127,10 +127,7 @@ export default async function handler(req: Request) {
         const labelIds = msgRes.data.labelIds ?? [];
         if (labelIds.includes('SENT')) {
           console.log(`[manual-poll] ⏭ Ignoré (label SENT) : ${gmailId}`);
-          await gmail.users.messages.modify({
-            userId: 'me', id: gmailId!,
-            requestBody: { removeLabelIds: ['UNREAD', 'INBOX'] },
-          }).catch(() => {});
+          await markAsRead(gmailId!);
           return 'skipped';
         }
 
@@ -151,11 +148,7 @@ export default async function handler(req: Request) {
         // ── Ignorer nos propres envois (filet de sécurité si -from:me a échoué) ──
         if (gmailAddress && fromEmail.toLowerCase() === gmailAddress) {
           console.log(`[manual-poll] ⏭ Ignoré (notre propre envoi) : ${subject}`);
-          // Marquer comme lu pour ne plus le revoir
-          await gmail.users.messages.modify({
-            userId: 'me', id: gmailId!,
-            requestBody: { removeLabelIds: ['UNREAD'] },
-          }).catch(() => {});
+          await markAsRead(gmailId!);
           return 'skipped';
         }
 
