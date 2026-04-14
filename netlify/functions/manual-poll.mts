@@ -82,8 +82,8 @@ export default async function handler(req: Request) {
     const toAutoReject = (pendingRows as any[]).filter(r => r.gmail_id && !unreadGmailIds.has(r.gmail_id));
     if (toAutoReject.length > 0) {
       const ids = toAutoReject.map((r: any) => r.id);
-      await db`UPDATE emails SET status = 'rejected' WHERE id = ANY(${ids})`.catch(() => {});
-      console.log(`[manual-poll] ${toAutoReject.length} email(s) lus dans Gmail → rejetés automatiquement`);
+      await db`DELETE FROM emails WHERE id = ANY(${ids})`.catch(() => {});
+      console.log(`[manual-poll] ${toAutoReject.length} email(s) lus dans Gmail → supprimés`);
     }
 
     // ── 3b. MAJ body_html + attachments pour les emails pending existants (sans rappeler Claude) ──

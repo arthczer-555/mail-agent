@@ -76,20 +76,29 @@ export default async function handler(req: Request) {
     // ACTION : reject
     // ──────────────────────────────────────────────────
     if (action === 'reject') {
-      // Garder en DB (status='rejected') pour éviter la réingestion par le polling
-      await db`
-        UPDATE emails
-        SET status = 'rejected', validated_by = ${user}, validated_at = NOW()
-        WHERE id = ${emailId}
-      `;
-      // Marquer comme lu dans Gmail
+      // 1. D'abord marquer comme lu dans Gmail
+      let gmailOk = false;
       if (email.gmail_id) {
-        const gmail = getGmailClient();
-        await gmail.users.messages.modify({
-          userId: 'me',
-          id: email.gmail_id,
-          requestBody: { removeLabelIds: ['UNREAD'] },
-        }).catch(() => {/* silencieux */});
+        try {
+          const gmail = getGmailClient();
+          await gmail.users.messages.modify({
+            userId: 'me',
+            id: email.gmail_id,
+            requestBody: { removeLabelIds: ['UNREAD'] },
+          });
+          gmailOk = true;
+        } catch (err) {
+          console.error(`[email-action] Échec marquage Gmail pour ${email.gmail_id}:`, err);
+        }
+      } else {
+        gmailOk = true; // Pas de gmail_id → rien à marquer
+      }
+
+      // 2. Si Gmail OK → supprimer de la DB. Sinon garder pour retry.
+      if (gmailOk) {
+        await db`DELETE FROM emails WHERE id = ${emailId}`;
+      } else {
+        await db`UPDATE emails SET status = 'rejected', validated_by = ${user}, validated_at = NOW() WHERE id = ${emailId}`;
       }
       return jsonResponse({ success: true, action: 'rejected' });
     }
@@ -98,22 +107,31 @@ export default async function handler(req: Request) {
     // ACTION : report (marquer comme spam dans Gmail)
     // ──────────────────────────────────────────────────
     if (action === 'report') {
+      let gmailOk = false;
       if (email.gmail_id) {
-        const gmail = getGmailClient();
-        await gmail.users.messages.modify({
-          userId: 'me',
-          id: email.gmail_id,
-          requestBody: {
-            addLabelIds: ['SPAM'],
-            removeLabelIds: ['INBOX', 'UNREAD'],
-          },
-        }).catch(() => {/* silencieux */});
+        try {
+          const gmail = getGmailClient();
+          await gmail.users.messages.modify({
+            userId: 'me',
+            id: email.gmail_id,
+            requestBody: {
+              addLabelIds: ['SPAM'],
+              removeLabelIds: ['INBOX', 'UNREAD'],
+            },
+          });
+          gmailOk = true;
+        } catch (err) {
+          console.error(`[email-action] Échec report Gmail pour ${email.gmail_id}:`, err);
+        }
+      } else {
+        gmailOk = true;
       }
-      await db`
-        UPDATE emails
-        SET status = 'rejected', validated_by = ${user}, validated_at = NOW()
-        WHERE id = ${emailId}
-      `;
+
+      if (gmailOk) {
+        await db`DELETE FROM emails WHERE id = ${emailId}`;
+      } else {
+        await db`UPDATE emails SET status = 'rejected', validated_by = ${user}, validated_at = NOW() WHERE id = ${emailId}`;
+      }
       return jsonResponse({ success: true, action: 'reported' });
     }
 
@@ -161,7 +179,7 @@ export default async function handler(req: Request) {
         requestBody: { raw, threadId: email.thread_id },
       });
 
-      // Marquer le message envoyé comme lu pour éviter qu'il réapparaisse dans le polling
+      // Marquer le message envoyé comme lu
       if (sendRes.data.id) {
         await gmail.users.messages.modify({
           userId: 'me',
@@ -170,19 +188,30 @@ export default async function handler(req: Request) {
         }).catch(() => {});
       }
 
-      await db`
-        UPDATE emails
-        SET status = 'sent', validated_by = ${user}, validated_at = NOW(),
-            final_response = ${responseText}
-        WHERE id = ${emailId}
-      `;
+      // Marquer l'email original comme lu dans Gmail AVANT de toucher la DB
+      let gmailOk = false;
+      try {
+        await gmail.users.messages.modify({
+          userId: 'me',
+          id: email.gmail_id,
+          requestBody: { removeLabelIds: ['UNREAD'] },
+        });
+        gmailOk = true;
+      } catch (err) {
+        console.error(`[email-action] Échec marquage Gmail pour ${email.gmail_id}:`, err);
+      }
 
-      // Marquer l'email original comme lu
-      await gmail.users.messages.modify({
-        userId: 'me',
-        id: email.gmail_id,
-        requestBody: { removeLabelIds: ['UNREAD'] },
-      }).catch(() => {});
+      // Si Gmail OK → supprimer de la DB. Sinon garder avec status='sent' pour ne pas réingérer.
+      if (gmailOk) {
+        await db`DELETE FROM emails WHERE id = ${emailId}`;
+      } else {
+        await db`
+          UPDATE emails
+          SET status = 'sent', validated_by = ${user}, validated_at = NOW(),
+              final_response = ${responseText}
+          WHERE id = ${emailId}
+        `;
+      }
 
       return jsonResponse({ success: true, action: 'sent' });
     }
@@ -229,17 +258,30 @@ export default async function handler(req: Request) {
           message: { raw, threadId: email.thread_id },
         },
       });
-      await db`
-        UPDATE emails
-        SET status = 'draft_saved', validated_by = ${user}, validated_at = NOW(),
-            final_response = ${responseText}
-        WHERE id = ${emailId}
-      `;
-      await gmail.users.messages.modify({
-        userId: 'me',
-        id: email.gmail_id,
-        requestBody: { removeLabelIds: ['UNREAD'] },
-      }).catch(() => {/* silencieux */});
+
+      // Marquer comme lu dans Gmail d'abord
+      let gmailOk = false;
+      try {
+        await gmail.users.messages.modify({
+          userId: 'me',
+          id: email.gmail_id,
+          requestBody: { removeLabelIds: ['UNREAD'] },
+        });
+        gmailOk = true;
+      } catch (err) {
+        console.error(`[email-action] Échec marquage Gmail pour ${email.gmail_id}:`, err);
+      }
+
+      if (gmailOk) {
+        await db`DELETE FROM emails WHERE id = ${emailId}`;
+      } else {
+        await db`
+          UPDATE emails
+          SET status = 'draft_saved', validated_by = ${user}, validated_at = NOW(),
+              final_response = ${responseText}
+          WHERE id = ${emailId}
+        `;
+      }
       return jsonResponse({ success: true, action: 'draft_saved' });
     }
 

@@ -34,26 +34,33 @@ export default async function handler(req: Request) {
     return jsonResponse({ success: true, updated: 0 });
   }
 
-  // Supprimer de la base (pour permettre le re-polling si remis non lu dans Gmail)
-  const ids = (rows as any[]).map((r: any) => r.id);
-  await db`DELETE FROM emails WHERE id = ANY(${ids}::uuid[])`;
+  // 1. D'abord marquer comme lus dans Gmail
+  const gmail    = getGmailClient();
+  const gmailIds = (rows as any[]).map((r: any) => r.gmail_id).filter(Boolean);
+  const results  = await Promise.allSettled(
+    gmailIds.map((gmailId: string) =>
+      gmail.users.messages.modify({
+        userId: 'me',
+        id:     gmailId,
+        requestBody: { removeLabelIds: ['UNREAD'] },
+      })
+    )
+  );
 
-  // Marquer comme lus dans Gmail (silencieux si erreur)
-  try {
-    const gmail    = getGmailClient();
-    const gmailIds = (rows as any[]).map((r: any) => r.gmail_id).filter(Boolean);
-    await Promise.allSettled(
-      gmailIds.map((gmailId: string) =>
-        gmail.users.messages.modify({
-          userId: 'me',
-          id:     gmailId,
-          requestBody: { removeLabelIds: ['UNREAD'] },
-        })
-      )
-    );
-  } catch {
-    // silencieux
+  // 2. Identifier quels gmail_ids ont été marqués avec succès
+  const succeededGmailIds = new Set(gmailIds.filter((_, i) => results[i].status === 'fulfilled'));
+  const idsToDelete = (rows as any[]).filter((r: any) => !r.gmail_id || succeededGmailIds.has(r.gmail_id)).map((r: any) => r.id);
+  const idsToKeep   = (rows as any[]).filter((r: any) => r.gmail_id && !succeededGmailIds.has(r.gmail_id)).map((r: any) => r.id);
+
+  // 3. Supprimer ceux confirmés par Gmail, garder les autres en rejected
+  if (idsToDelete.length > 0) {
+    await db`DELETE FROM emails WHERE id = ANY(${idsToDelete}::uuid[])`;
   }
+  if (idsToKeep.length > 0) {
+    await db`UPDATE emails SET status = 'rejected' WHERE id = ANY(${idsToKeep}::uuid[])`;
+  }
+
+  const ids = (rows as any[]).map((r: any) => r.id);
 
   return jsonResponse({ success: true, updated: ids.length });
 }
