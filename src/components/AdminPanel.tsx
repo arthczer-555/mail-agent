@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Example, Rule, Classification, CLASSIFICATION_CONFIG } from '../types'
 
-type Tab = 'guide' | 'rules'
+type Tab = 'guide' | 'rules' | 'model'
 
 const CLASSIFICATIONS: Classification[] = ['URGENT', 'IMPORTANT', 'NORMAL', 'FAIBLE']
 
@@ -13,7 +13,7 @@ export default function AdminPanel() {
       <h1 className="text-xl font-bold text-gray-900 mb-6">Administration de l'agent</h1>
 
       <div className="flex gap-1 mb-6 border-b border-gray-200">
-        {(['guide', 'rules'] as Tab[]).map(tab => (
+        {(['guide', 'rules', 'model'] as Tab[]).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -23,13 +23,14 @@ export default function AdminPanel() {
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >
-            {tab === 'guide' ? '📄 Guide & Exemples' : '⚙️ Règles de classification'}
+            {tab === 'guide' ? '📄 Guide & Exemples' : tab === 'rules' ? '⚙️ Règles de classification' : '🤖 Modèle Claude'}
           </button>
         ))}
       </div>
 
       {activeTab === 'guide' && <GuideAndExamplesTab />}
       {activeTab === 'rules' && <RulesTab />}
+      {activeTab === 'model' && <ModelTab />}
     </div>
   )
 }
@@ -594,6 +595,126 @@ function RulesTab() {
                 </div>
               )
             })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Onglet Modèle Claude ──────────────────────────────────────
+type ClaudeModel = 'claude-sonnet-4-6' | 'claude-haiku-4-5-20251001'
+
+const MODEL_OPTIONS: { value: ClaudeModel; label: string; description: string; pricing: string }[] = [
+  {
+    value: 'claude-sonnet-4-6',
+    label: 'Sonnet 4.6',
+    description: 'Modèle premium — meilleure qualité de classification et de rédaction.',
+    pricing: '3 $ / 15 $ par million de tokens (entrée / sortie)',
+  },
+  {
+    value: 'claude-haiku-4-5-20251001',
+    label: 'Haiku 4.5',
+    description: 'Modèle rapide et économique — 3× moins cher, idéal en cas de volume ou crédit limité.',
+    pricing: '1 $ / 5 $ par million de tokens (entrée / sortie)',
+  },
+]
+
+function ModelTab() {
+  const [current, setCurrent] = useState<ClaudeModel>('claude-sonnet-4-6')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving]   = useState(false)
+  const [feedback, setFeedback] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(d => {
+        const m = d.settings?.claude_model
+        if (m === 'claude-sonnet-4-6' || m === 'claude-haiku-4-5-20251001') setCurrent(m)
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleSelect = async (model: ClaudeModel) => {
+    if (model === current) return
+    setSaving(true)
+    setFeedback(null)
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'claude_model', value: model }),
+      })
+      if (res.ok) {
+        setCurrent(model)
+        setFeedback('Modèle mis à jour ✓')
+      } else {
+        const data = await res.json().catch(() => null)
+        setFeedback(`Erreur : ${data?.error ?? 'inconnu'}`)
+      }
+    } catch {
+      setFeedback('Erreur réseau')
+    }
+    setSaving(false)
+    setTimeout(() => setFeedback(null), 4000)
+  }
+
+  if (loading) {
+    return (
+      <div className="card p-6 text-sm text-gray-400">Chargement...</div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="card p-6">
+        <h2 className="font-semibold text-gray-900 mb-1">Modèle utilisé pour traiter les emails</h2>
+        <p className="text-xs text-gray-500 mb-5">
+          Ce modèle est utilisé pour classifier les emails entrants et rédiger les brouillons de réponse.
+          Le changement est appliqué dans la minute (cache de 60s côté serveur).
+        </p>
+
+        <div className="grid grid-cols-2 gap-4">
+          {MODEL_OPTIONS.map(opt => {
+            const selected = current === opt.value
+            return (
+              <button
+                key={opt.value}
+                onClick={() => handleSelect(opt.value)}
+                disabled={saving}
+                className={`text-left p-4 rounded-xl border-2 transition-all ${
+                  selected
+                    ? 'border-indigo-600 bg-indigo-50'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`font-semibold text-sm ${selected ? 'text-indigo-700' : 'text-gray-800'}`}>
+                    {opt.label}
+                  </span>
+                  {selected && (
+                    <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
+                      Actif
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-600 mb-2">{opt.description}</p>
+                <p className="text-[11px] text-gray-400 font-mono">{opt.pricing}</p>
+              </button>
+            )
+          })}
+        </div>
+
+        {feedback && (
+          <div className="mt-4">
+            <span className={`text-sm px-3 py-1.5 rounded-lg ${
+              feedback.startsWith('Erreur')
+                ? 'bg-red-50 text-red-700'
+                : 'bg-green-50 text-green-700'
+            }`}>
+              {feedback}
+            </span>
           </div>
         )}
       </div>
