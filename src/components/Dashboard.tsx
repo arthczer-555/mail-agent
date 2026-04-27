@@ -43,6 +43,27 @@ export default function Dashboard() {
   const [composing, setComposing] = useState(false)
 
   const [draftCount, setDraftCount] = useState(0)
+  const [usageOpen, setUsageOpen] = useState(false)
+  const [usageData, setUsageData] = useState<any>(null)
+  const [usageLoading, setUsageLoading] = useState(false)
+
+  const openUsage = async () => {
+    setUsageOpen(true)
+    setUsageLoading(true)
+    try {
+      const res = await fetch('/api/usage')
+      const text = await res.text()
+      let data: any
+      try { data = JSON.parse(text) } catch {
+        throw new Error(`Réponse non-JSON (${res.status}): ${text.slice(0, 200)}`)
+      }
+      if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`)
+      setUsageData(data)
+    } catch (err: any) {
+      setUsageData({ error: `Erreur de chargement : ${err?.message ?? err}` })
+    }
+    setUsageLoading(false)
+  }
 
   const fetchEmails = useCallback(async () => {
     try {
@@ -84,11 +105,11 @@ export default function Dashboard() {
     fetchEmails()
     fetchUnreadCount()
     const interval = setInterval(() => {
-      fetchEmails()
+      syncRead().then(() => fetchEmails())
       fetchUnreadCount()
     }, 2 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [fetchEmails, fetchUnreadCount])
+  }, [fetchEmails, fetchUnreadCount, syncRead])
 
   const handleOpen = (email: Email) => {
     setSelected(email)
@@ -325,8 +346,150 @@ export default function Dashboard() {
             {refreshed ? 'Actualisé ✓' : 'Actualiser'}
           </button>
           <span>— {lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+          <button
+            onClick={openUsage}
+            className="hover:text-[#E8452A] transition-colors underline underline-offset-2"
+          >
+            Usage
+          </button>
         </div>
       </div>
+
+      {/* ── Modal Usage ── */}
+      {usageOpen && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) setUsageOpen(false) }}
+        >
+          <div className="w-full max-w-3xl max-h-[90vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#EDE8E0]">
+              <h2 className="text-lg font-semibold text-[#1a1a1a]">Usage Claude — Coût du bot</h2>
+              <button
+                onClick={() => setUsageOpen(false)}
+                className="text-[#999] hover:text-[#1a1a1a] text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {usageLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin h-6 w-6 border-2 border-[#E8452A] border-t-transparent rounded-full" />
+                </div>
+              ) : usageData?.error ? (
+                <p className="text-red-600 text-sm">{usageData.error}</p>
+              ) : usageData?.summary ? (
+                <>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-[#F5F0EA] rounded-xl p-4">
+                      <p className="text-xs text-[#999] uppercase tracking-wider mb-1">Coût total</p>
+                      <p className="text-2xl font-bold text-[#1a1a1a]">
+                        ${usageData.summary.total_cost.toFixed(4)}
+                      </p>
+                    </div>
+                    <div className="bg-[#F5F0EA] rounded-xl p-4">
+                      <p className="text-xs text-[#999] uppercase tracking-wider mb-1">Coût moyen / mail</p>
+                      <p className="text-2xl font-bold text-[#1a1a1a]">
+                        ${usageData.summary.avg_cost_per_email.toFixed(5)}
+                      </p>
+                      <p className="text-[10px] text-[#999] mt-1">
+                        sur {usageData.summary.emails_processed} mail{usageData.summary.emails_processed > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <div className="bg-[#F5F0EA] rounded-xl p-4">
+                      <p className="text-xs text-[#999] uppercase tracking-wider mb-1">Appels totaux</p>
+                      <p className="text-2xl font-bold text-[#1a1a1a]">
+                        {usageData.summary.total_calls}
+                      </p>
+                      <p className="text-[10px] text-[#999] mt-1">
+                        {usageData.summary.total_input.toLocaleString()} in / {usageData.summary.total_output.toLocaleString()} out
+                      </p>
+                    </div>
+                  </div>
+
+                  {usageData.by_function?.length > 0 && (
+                    <div>
+                      <h3 className="text-xs uppercase tracking-wider text-[#999] font-semibold mb-2">Par fonction</h3>
+                      <div className="border border-[#EDE8E0] rounded-xl overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead className="bg-[#F5F0EA] text-[#666]">
+                            <tr>
+                              <th className="text-left px-3 py-2 font-semibold">Fonction</th>
+                              <th className="text-left px-3 py-2 font-semibold">Modèle</th>
+                              <th className="text-right px-3 py-2 font-semibold">Appels</th>
+                              <th className="text-right px-3 py-2 font-semibold">In</th>
+                              <th className="text-right px-3 py-2 font-semibold">Out</th>
+                              <th className="text-right px-3 py-2 font-semibold">Coût</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {usageData.by_function.map((row: any, i: number) => (
+                              <tr key={i} className="border-t border-[#EDE8E0]">
+                                <td className="px-3 py-2 text-[#1a1a1a]">{row.function_name}</td>
+                                <td className="px-3 py-2 text-[#666]">{row.model}</td>
+                                <td className="px-3 py-2 text-right">{row.calls}</td>
+                                <td className="px-3 py-2 text-right text-[#666]">{row.input_tokens.toLocaleString()}</td>
+                                <td className="px-3 py-2 text-right text-[#666]">{row.output_tokens.toLocaleString()}</td>
+                                <td className="px-3 py-2 text-right font-semibold">${row.cost.toFixed(4)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-xs uppercase tracking-wider text-[#999] font-semibold mb-2">
+                      Log complet ({usageData.log?.length ?? 0} dernier{(usageData.log?.length ?? 0) > 1 ? 's' : ''} appel{(usageData.log?.length ?? 0) > 1 ? 's' : ''})
+                    </h3>
+                    <div className="border border-[#EDE8E0] rounded-xl overflow-hidden max-h-96 overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-[#F5F0EA] text-[#666] sticky top-0">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-semibold">Date</th>
+                            <th className="text-left px-3 py-2 font-semibold">Fonction</th>
+                            <th className="text-left px-3 py-2 font-semibold">Sujet</th>
+                            <th className="text-right px-3 py-2 font-semibold">In</th>
+                            <th className="text-right px-3 py-2 font-semibold">Out</th>
+                            <th className="text-right px-3 py-2 font-semibold">Coût</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(usageData.log ?? []).map((row: any) => (
+                            <tr key={row.id} className="border-t border-[#EDE8E0]">
+                              <td className="px-3 py-2 text-[#666] whitespace-nowrap">
+                                {new Date(row.created_at).toLocaleString('fr-FR', {
+                                  day: '2-digit', month: '2-digit',
+                                  hour: '2-digit', minute: '2-digit',
+                                })}
+                              </td>
+                              <td className="px-3 py-2 text-[#1a1a1a]">{row.function_name}</td>
+                              <td className="px-3 py-2 text-[#666] truncate max-w-[200px]" title={row.email_subject ?? ''}>
+                                {row.email_subject ?? '—'}
+                              </td>
+                              <td className="px-3 py-2 text-right text-[#666]">{row.input_tokens.toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right text-[#666]">{row.output_tokens.toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right font-semibold">${row.cost_usd.toFixed(5)}</td>
+                            </tr>
+                          ))}
+                          {(usageData.log ?? []).length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="text-center py-6 text-[#999]">Aucun appel enregistré</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

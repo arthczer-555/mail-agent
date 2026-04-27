@@ -61,11 +61,35 @@ CREATE TABLE IF NOT EXISTS classification_rules (
   created_at      TIMESTAMP DEFAULT NOW()
 );
 
+-- Table : paramètres globaux (clé-valeur)
+CREATE TABLE IF NOT EXISTS settings (
+  key         VARCHAR(100) PRIMARY KEY,
+  value       TEXT NOT NULL,
+  updated_at  TIMESTAMP DEFAULT NOW()
+);
+
+-- Table : log des appels à l'API Claude (coût)
+CREATE TABLE IF NOT EXISTS claude_usage (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  function_name         VARCHAR(100) NOT NULL,
+  model                 VARCHAR(100) NOT NULL,
+  input_tokens          INTEGER NOT NULL DEFAULT 0,
+  output_tokens         INTEGER NOT NULL DEFAULT 0,
+  cache_read_tokens     INTEGER NOT NULL DEFAULT 0,
+  cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+  cost_usd              NUMERIC(10, 6) NOT NULL DEFAULT 0,
+  email_id              UUID,
+  email_subject         TEXT,
+  created_at            TIMESTAMP DEFAULT NOW()
+);
+
 -- Index pour accélérer les requêtes fréquentes
 CREATE INDEX IF NOT EXISTS idx_emails_status       ON emails(status);
 CREATE INDEX IF NOT EXISTS idx_emails_classification ON emails(classification);
 CREATE INDEX IF NOT EXISTS idx_emails_received_at   ON emails(received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_emails_gmail_id      ON emails(gmail_id);
+CREATE INDEX IF NOT EXISTS idx_claude_usage_created ON claude_usage(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_claude_usage_email   ON claude_usage(email_id);
 
 -- Trigger : mise à jour automatique de updated_at
 CREATE OR REPLACE FUNCTION update_updated_at()

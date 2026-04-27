@@ -70,6 +70,11 @@
   to     = "/.netlify/functions/compose-email"
   status = 200
 
+[[redirects]]
+  from   = "/api/usage"
+  to     = "/.netlify/functions/usage"
+  status = 200
+
 # ── SPA fallback (React Router) ──
 [[redirects]]
   from   = "/*"
